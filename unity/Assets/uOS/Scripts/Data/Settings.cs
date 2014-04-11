@@ -6,128 +6,131 @@ using UnityEditor;
 using UnityEngine;
 
 
-/// <summary>
-/// Global settings for uOS.
-/// </summary>
-#if UNITY_EDITOR
-[InitializeOnLoad]
-#endif
-public class uOSSettings : ScriptableObject
+namespace Uos
 {
-    const string uOSSettingsAssetName = "uOSSettings";
-    const string uOSSettingsPath = "uOS/Resources";
-    const string uOSSettingsAssetExtension = ".asset";
-
-    private static uOSSettings _instance;
-    static uOSSettings instance
+    /// <summary>
+    /// Global settings for uOS.
+    /// </summary>
+#if UNITY_EDITOR
+    [InitializeOnLoad]
+#endif
+    public class Settings : ScriptableObject
     {
-        get
+        const string uOSSettingsAssetName = "uOSSettings";
+        const string uOSSettingsPath = "uOS/Resources";
+        const string uOSSettingsAssetExtension = ".asset";
+
+        private static Settings _instance;
+        static Settings instance
         {
-            if (_instance == null)
+            get
             {
-                _instance = Resources.Load(uOSSettingsAssetName) as uOSSettings;
                 if (_instance == null)
                 {
-                    // If not found, autocreate the asset object.
-                    _instance = CreateInstance<uOSSettings>();
-#if UNITY_EDITOR
-                    string properPath = Path.Combine(Application.dataPath, uOSSettingsPath);
-                    if (!Directory.Exists(properPath))
+                    _instance = Resources.Load(uOSSettingsAssetName) as Settings;
+                    if (_instance == null)
                     {
-                        AssetDatabase.CreateFolder("Assets/uOS", "Resources");
-                    }
+                        // If not found, autocreate the asset object.
+                        _instance = CreateInstance<Settings>();
+#if UNITY_EDITOR
+                        string properPath = Path.Combine(Application.dataPath, uOSSettingsPath);
+                        if (!Directory.Exists(properPath))
+                        {
+                            AssetDatabase.CreateFolder("Assets/uOS", "Resources");
+                        }
 
-                    string fullPath = Path.Combine(
-                        Path.Combine("Assets", uOSSettingsPath), uOSSettingsAssetName + uOSSettingsAssetExtension);
-                    AssetDatabase.CreateAsset(_instance, fullPath);
+                        string fullPath = Path.Combine(
+                            Path.Combine("Assets", uOSSettingsPath), uOSSettingsAssetName + uOSSettingsAssetExtension);
+                        AssetDatabase.CreateAsset(_instance, fullPath);
 #endif
+                    }
                 }
+                return _instance;
             }
-            return _instance;
         }
-    }
 
 #if UNITY_EDITOR
-    [MenuItem("uOS/Edit Settings")]
-    public static void Edit()
-    {
-        Selection.activeObject = instance;
-    }
+        [MenuItem("uOS/Edit Settings")]
+        public static void Edit()
+        {
+            Selection.activeObject = instance;
+        }
 #endif
 
 
 
 
-    //ubiquitos.radar=br.unb.unbiquitous.ubiquitos.network.ethernet.radar.EthernetArpRadar
-    //ubiquitos.connectionManager=org.unbiquitous.uos.network.socket.connectionManager.EthernetTCPConnectionManager, org.unbiquitous.uos.network.socket.connectionManager.EthernetUDPConnectionManager
-    ////ubiquitos.connectionManager=br.unb.unbiquitous.ubiquitos.network.bluetooth.connectionManager.BluetoothConnectionManager
+        //ubiquitos.radar=br.unb.unbiquitous.ubiquitos.network.ethernet.radar.EthernetArpRadar
+        //ubiquitos.connectionManager=org.unbiquitous.uos.network.socket.connectionManager.EthernetTCPConnectionManager, org.unbiquitous.uos.network.socket.connectionManager.EthernetUDPConnectionManager
+        ////ubiquitos.connectionManager=br.unb.unbiquitous.ubiquitos.network.bluetooth.connectionManager.BluetoothConnectionManager
 
-    //ubiquitos.eth
-    public uOSEthernetSettings eth = new uOSEthernetSettings();
+        //ubiquitos.eth
+        public uOSEthernetSettings eth = new uOSEthernetSettings();
 
-    //ubiquitos.bth
-    public uOSBluetoothSettings bth = new uOSBluetoothSettings();
+        //ubiquitos.bth
+        public uOSBluetoothSettings bth = new uOSBluetoothSettings();
 
-    //ubiquitos.driver.deploylist=org.unbiquitous.uos.core.driver.DeviceDriverImpl;\
-    //    org.unbiquitous.uos.core.driver.OntologyDriverImpl;\
-    //    org.unbiquitous.uos.core.driver.UserDriver(My_user_driver);
+        //ubiquitos.driver.deploylist=org.unbiquitous.uos.core.driver.DeviceDriverImpl;\
+        //    org.unbiquitous.uos.core.driver.OntologyDriverImpl;\
+        //    org.unbiquitous.uos.core.driver.UserDriver(My_user_driver);
 
-    //ubiquitos.uos.deviceName=DublinDevice
-    public string deviceName = "DublinDevice";
-}
+        //ubiquitos.uos.deviceName=DublinDevice
+        public string deviceName = "DublinDevice";
+    }
 
-//ubiquitos.eth.tcp
-[System.Serializable]
-public class uOSTCPSettings
-{
-    //ubiquitos.eth.tcp.port=14984
-    public string port = "14984";
-
-    //ubiquitos.eth.tcp.passivePortRange=14985-15000
-    public string passivePortRange = "14985-15000";
-}
-
-
-//ubiquitos.eth.udp
-[System.Serializable]
-public class uOSUDPSettings
-{
-    //ubiquitos.eth.udp.port=15001
-    public string port = "15001";
-
-    //ubiquitos.eth.udp.passivePortRange=15002-15017
-    public string passivePortRange = "15002-15017";
-}
-
-//ubiquitos.eth.rtp
-[System.Serializable]
-public class uOSRTPSettings
-{
-    //ubiquitos.eth.rtp.passivePortRange=15018-15028
-    public string passivePortRange = "15018-15028";
-}
-
-//ubiquitos.eth
-[System.Serializable]
-public class uOSEthernetSettings
-{
     //ubiquitos.eth.tcp
-    public uOSTCPSettings tcp = new uOSTCPSettings();
+    [System.Serializable]
+    public class uOSTCPSettings
+    {
+        //ubiquitos.eth.tcp.port=14984
+        public string port = "14984";
+
+        //ubiquitos.eth.tcp.passivePortRange=14985-15000
+        public string passivePortRange = "14985-15000";
+    }
+
 
     //ubiquitos.eth.udp
-    public uOSUDPSettings udp = new uOSUDPSettings();
+    [System.Serializable]
+    public class uOSUDPSettings
+    {
+        //ubiquitos.eth.udp.port=15001
+        public string port = "15001";
+
+        //ubiquitos.eth.udp.passivePortRange=15002-15017
+        public string passivePortRange = "15002-15017";
+    }
 
     //ubiquitos.eth.rtp
-    public uOSRTPSettings rtp = new uOSRTPSettings();
-}
+    [System.Serializable]
+    public class uOSRTPSettings
+    {
+        //ubiquitos.eth.rtp.passivePortRange=15018-15028
+        public string passivePortRange = "15018-15028";
+    }
 
-//ubiquitos.bth
-[System.Serializable]
-public class uOSBluetoothSettings
-{
-    //ubiquitos.bth.provider=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    public string provider = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    //ubiquitos.eth
+    [System.Serializable]
+    public class uOSEthernetSettings
+    {
+        //ubiquitos.eth.tcp
+        public uOSTCPSettings tcp = new uOSTCPSettings();
 
-    //ubiquitos.bth.client=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-    public string client = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB";
+        //ubiquitos.eth.udp
+        public uOSUDPSettings udp = new uOSUDPSettings();
+
+        //ubiquitos.eth.rtp
+        public uOSRTPSettings rtp = new uOSRTPSettings();
+    }
+
+    //ubiquitos.bth
+    [System.Serializable]
+    public class uOSBluetoothSettings
+    {
+        //ubiquitos.bth.provider=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        public string provider = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+        //ubiquitos.bth.client=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+        public string client = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB";
+    }
 }
