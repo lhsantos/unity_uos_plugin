@@ -7,17 +7,17 @@ using UnityEngine;
 /// <summary>
 /// Editor for uOSSettings.
 /// </summary>
-[CustomEditor(typeof(uOSSettings))]
+[CustomEditor(typeof(Uos.Settings))]
 public class uOSSettingsEditor : Editor
 {
-    private uOSSettings instance;
+    private Uos.Settings instance;
 
     /// <summary>
     /// Draws inspector GUI.
     /// </summary>
     public override void OnInspectorGUI()
     {
-        instance = (uOSSettings)target;
+        instance = (Uos.Settings)target;
 
         DrawDefaultInspector();
     }
