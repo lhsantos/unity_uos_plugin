@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-public sealed class uOS : ScriptableObject
+namespace UOS
 {
+    public sealed class uOS : ScriptableObject
+    {
+    }
 }

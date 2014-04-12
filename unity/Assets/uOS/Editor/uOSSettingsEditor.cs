@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -7,17 +6,17 @@ using UnityEngine;
 /// <summary>
 /// Editor for uOSSettings.
 /// </summary>
-[CustomEditor(typeof(Uos.Settings))]
+[CustomEditor(typeof(UOS.Settings))]
 public class uOSSettingsEditor : Editor
 {
-    private Uos.Settings instance;
+    private UOS.Settings instance;
 
     /// <summary>
     /// Draws inspector GUI.
     /// </summary>
     public override void OnInspectorGUI()
     {
-        instance = (Uos.Settings)target;
+        instance = (UOS.Settings)target;
 
         DrawDefaultInspector();
     }

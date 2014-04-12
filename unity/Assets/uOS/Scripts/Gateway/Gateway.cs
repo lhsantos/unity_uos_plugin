@@ -1,7 +1,4 @@
-﻿using UnityEngine;
-using System.Collections;
-
-namespace Uos
+﻿namespace UOS
 {
     public interface Gateway
     {

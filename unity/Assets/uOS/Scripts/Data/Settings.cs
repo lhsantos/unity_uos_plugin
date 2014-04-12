@@ -6,7 +6,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace Uos
+namespace UOS
 {
     /// <summary>
     /// Global settings for uOS.
