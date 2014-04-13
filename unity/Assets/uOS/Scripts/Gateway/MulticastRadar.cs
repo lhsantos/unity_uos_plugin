@@ -1,8 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using UnityEngine;
 
 
 namespace UOS
@@ -10,37 +8,28 @@ namespace UOS
     /// <summary>
     /// Implements a UOS Radar using ping.
     /// </summary>
-    public class MulticastRadar : UnityRadar
+    public class MulticastRadar : NetworkRadar
     {
         /// <summary>
         /// The port to be used by this Radar.
         /// </summary>
         public int port = 14984;
 
-        private UdpClient udpClient;
+        private UdpClient udpClient = null;
 
-        private float lastCheck;
-        private float now;
+        private System.DateTime lastCheck;
         private HashSet<string> lastAddresses;
         private HashSet<string> knownAddresses = new HashSet<string>();
 
-        protected override void Awake()
-        {
-            base.Awake();
-            now = Time.time;
-        }
-        protected override void Update()
-        {
-            base.Update();
-            now = Time.time;
-        }
+        public MulticastRadar(Logger logger = null)
+            : base(logger) { }
 
         /// <summary>
         /// The main radar thread.
         /// </summary>
         protected override void RadarThread()
         {
-            lastCheck = now;
+            lastCheck = System.DateTime.Now;
             lastAddresses = new HashSet<string>();
 
             udpClient = new UdpClient();
@@ -97,7 +86,8 @@ namespace UOS
 
         private void CheckLeftDevices()
         {
-            if ((now - lastCheck) > 30)
+            System.DateTime now = System.DateTime.Now;
+            if (now.Subtract(lastCheck).Seconds > 30)
             {
                 SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
                 lastAddresses.RemoveWhere(a => knownAddresses.Contains(a));

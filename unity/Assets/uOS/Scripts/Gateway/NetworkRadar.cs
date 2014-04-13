@@ -1,7 +1,5 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
-using UnityEngine;
 
 
 namespace UOS
@@ -48,17 +46,10 @@ namespace UOS
     }
 
     /// <summary>
-    /// Base class for all Unity radar implementations.
+    /// Base class for all network radar implementations.
     /// </summary>
-    public abstract class UnityRadar : MonoBehaviour, Radar
+    public abstract class NetworkRadar : Radar
     {
-        private struct InternalEvent
-        {
-            public RadarEvent type;
-            public NetworkDevice device;
-        }
-
-
         /// <summary>
         /// UnityRadar events' handler.
         /// </summary>
@@ -76,34 +67,13 @@ namespace UOS
         /// Is this radar running?
         /// </summary>
         protected bool running;
-
-        private Queue<InternalEvent> events = new Queue<InternalEvent>();
-        private readonly object _queue_lock = new object();
+        protected Logger logger;
 
 
-        /// <summary>
-        /// Called when this object is created.
-        /// </summary>
-        protected virtual void Awake()
+        protected NetworkRadar(Logger logger = null)
         {
             running = false;
-        }
-
-        /// <summary>
-        /// If a subclass overrides this method and does not call this base implementation,
-        /// wild rabbits will bite you to death!
-        /// </summary>
-        protected virtual void Update()
-        {
-            lock (_queue_lock)
-            {
-                while (events.Count > 0)
-                {
-                    InternalEvent e = events.Dequeue();
-                    if (DevicesChanged != null)
-                        DevicesChanged(this, e.type, e.device);
-                }
-            }
+            this.logger = logger;
         }
 
         /// <summary>
@@ -112,7 +82,7 @@ namespace UOS
         public virtual void StartRadar()
         {
             if (running)
-                Debug.LogWarning("Radar on " + name + " already running.");
+                logger.LogWarning("Radar on already running.");
             else
             {
                 running = true;
@@ -140,10 +110,8 @@ namespace UOS
         /// <param name="device">The device.</param>
         protected void RaiseDeviceEntered(NetworkDevice device)
         {
-            lock (_queue_lock)
-            {
-                events.Enqueue(new InternalEvent { type = RadarEvent.DEVICE_ENTERED, device = device });
-            }
+            if (DevicesChanged != null)
+                DevicesChanged(this, RadarEvent.DEVICE_ENTERED, device);
         }
 
         /// <summary>
@@ -152,10 +120,8 @@ namespace UOS
         /// <param name="device">The device.</param>
         protected void RaiseDeviceLeft(NetworkDevice device)
         {
-            lock (_queue_lock)
-            {
-                events.Enqueue(new InternalEvent { type = RadarEvent.DEVICE_LEFT, device = device });
-            }
+            if (DevicesChanged != null)
+                DevicesChanged(this, RadarEvent.DEVICE_LEFT, device);
         }
     }
 }

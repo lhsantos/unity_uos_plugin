@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using UnityEngine;
 
 
 namespace UOS
@@ -7,62 +6,37 @@ namespace UOS
     /// <summary>
     /// MonoBehaviour to interface with iOS
     /// </summary>
-    public class UnityGateway : MonoBehaviour, Gateway
+    public class UnityGateway : Gateway
     {
-        /// <summary>
-        /// Which type of Radar should this UnityGateway use?
-        /// </summary>
-        public enum RadarType
+        private uOSSettings settings;
+        private Logger logger = new UnityLogger();
+        private NetworkRadar radar = null;
+
+        public UnityGateway(uOSSettings uOSSettings)
         {
-            MULTICAST,
-            ARP,
-            PING,
-            NONE
-        }
+            this.settings = uOSSettings;
 
-        /// <summary>
-        /// The type of Radar this gateway should use.
-        /// </summary>
-        public RadarType radarType = RadarType.MULTICAST;
-
-
-        private UnityRadar radar = null;
-
-
-        /// <summary>
-        /// Called when this object is created.
-        /// </summary>
-        void Awake()
-        {
             PrepareRadar();
         }
 
         /// <summary>
-        /// Called right before the first update.
+        /// Initialises this Gateway.
         /// </summary>
-        void Start()
+        public void Init()
         {
-            if (radar)
+            if (radar != null)
             {
                 radar.DevicesChanged += OnRadarEvent;
                 radar.StartRadar();
             }
         }
 
-        /// <summary>
-        /// Called once every frame.
-        /// </summary>
-        void Update()
-        {
-        }
-
-
         private void PrepareRadar()
         {
-            switch (radarType)
+            switch (settings.radarType)
             {
                 case RadarType.MULTICAST:
-                    radar = gameObject.AddComponent<MulticastRadar>();
+                    radar = new MulticastRadar(logger);
                     break;
 
                 default:
@@ -72,7 +46,7 @@ namespace UOS
 
         private void OnRadarEvent(object sender, RadarEvent type, NetworkDevice device)
         {
-            Debug.Log(type.ToString() + ": " + device.networkDeviceName);
+            logger.Log(type.ToString() + ": " + device.networkDeviceName);
         }
     }
 }

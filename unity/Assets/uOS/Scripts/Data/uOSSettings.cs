@@ -14,24 +14,24 @@ namespace UOS
 #if UNITY_EDITOR
     [InitializeOnLoad]
 #endif
-    public class Settings : ScriptableObject
+    public class uOSSettings : ScriptableObject
     {
         const string uOSSettingsAssetName = "uOSSettings";
         const string uOSSettingsPath = "uOS/Resources";
         const string uOSSettingsAssetExtension = ".asset";
 
-        private static Settings _instance;
-        static Settings instance
+        private static uOSSettings _instance;
+        public static uOSSettings instance
         {
             get
             {
                 if (_instance == null)
                 {
-                    _instance = Resources.Load(uOSSettingsAssetName) as Settings;
+                    _instance = Resources.Load(uOSSettingsAssetName) as uOSSettings;
                     if (_instance == null)
                     {
                         // If not found, autocreate the asset object.
-                        _instance = CreateInstance<Settings>();
+                        _instance = CreateInstance<uOSSettings>();
 #if UNITY_EDITOR
                         string properPath = Path.Combine(Application.dataPath, uOSSettingsPath);
                         if (!Directory.Exists(properPath))
@@ -76,6 +76,8 @@ namespace UOS
 
         //ubiquitos.uos.deviceName=DublinDevice
         public string deviceName = "DublinDevice";
+
+        public RadarType radarType;
     }
 
     //ubiquitos.eth.tcp
@@ -132,5 +134,16 @@ namespace UOS
 
         //ubiquitos.bth.client=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
         public string client = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB";
+    }
+
+    /// <summary>
+    /// Which type of Radar should the gateway use?
+    /// </summary>
+    public enum RadarType
+    {
+        MULTICAST,
+        ARP,
+        PING,
+        NONE
     }
 }

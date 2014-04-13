@@ -1,5 +1,7 @@
-﻿using UnityEngine;
-using System.Collections;
+﻿using System.Collections.Generic;
+using UnityEngine;
+using UOS;
+
 
 public class TestUOS : MonoBehaviour
 {
@@ -8,6 +10,7 @@ public class TestUOS : MonoBehaviour
     /// </summary>
     void Start()
     {
+        uOS.Init();
     }
 
     /// <summary>
