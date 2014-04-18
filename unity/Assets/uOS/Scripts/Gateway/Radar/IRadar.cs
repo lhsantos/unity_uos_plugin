@@ -3,7 +3,7 @@
     /// <summary>
     /// Interface of all uOS Radars.
     /// </summary>
-    public interface Radar
+    public interface IRadar
     {
         /// <summary>
         /// Starts the radar.

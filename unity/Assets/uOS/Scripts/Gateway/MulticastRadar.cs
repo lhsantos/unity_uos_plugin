@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 
 namespace UOS
@@ -8,8 +9,16 @@ namespace UOS
     /// <summary>
     /// Implements a UOS Radar using ping.
     /// </summary>
-    public class MulticastRadar : NetworkRadar
+    public class UnityMulticastRadar : UnityNetworkRadar
     {
+        private object _receive_lock = new object();
+
+        private struct ReceiveEvent
+        {
+            public IPEndPoint remoteEndPoint;
+            public byte[] data;
+        }
+
         /// <summary>
         /// The port to be used by this Radar.
         /// </summary>
@@ -17,56 +26,131 @@ namespace UOS
 
         private UdpClient udpClient = null;
 
+        private bool waiting;
+        private System.DateTime receiveStart;
+        private System.IAsyncResult receiveAsyncResult = null;
         private System.DateTime lastCheck;
         private HashSet<string> lastAddresses;
         private HashSet<string> knownAddresses = new HashSet<string>();
 
-        public MulticastRadar(Logger logger = null)
+        public UnityMulticastRadar(Logger logger)
             : base(logger) { }
 
-        /// <summary>
-        /// The main radar thread.
-        /// </summary>
-        protected override void RadarThread()
+        public override void StartRadar()
         {
-            lastCheck = System.DateTime.Now;
-            lastAddresses = new HashSet<string>();
+            base.StartRadar();
 
-            udpClient = new UdpClient();
-            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 10 * 1000); // 10 seconds
-            udpClient.ExclusiveAddressUse = false;
-            udpClient.EnableBroadcast = true;
-
-            udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
-
-            SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
-
-            while (running)
+            if (udpClient == null)
             {
-                ReceiveAnswers();
-                CheckLeftDevices();
-            }
+                lastCheck = System.DateTime.Now;
+                lastAddresses = new HashSet<string>();
 
-            udpClient.Close();
+                udpClient = new UdpClient();
+                udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                udpClient.ExclusiveAddressUse = false;
+                udpClient.EnableBroadcast = true;
+
+                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
+
+                SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
+            }
+        }
+
+        public override void StopRadar()
+        {
+            base.StopRadar();
+
             udpClient = null;
         }
 
 
+        /// <summary>
+        /// The main radar thread.
+        /// </summary>
+        public override void Update()
+        {
+            base.Update();
+
+            if (udpClient != null)
+            {
+                if (waiting)
+                {
+                    lock (_receive_lock)
+                    {
+                        if ((receiveAsyncResult != null) && (System.DateTime.Now.Subtract(receiveStart).Seconds > 10))
+                        {
+                            IPEndPoint ep = null;
+                            udpClient.EndReceive(receiveAsyncResult, ref ep);
+                            logger.Log("Receive timout!");
+                            ReceiveAnswers();
+                        }
+                    }
+                }
+                else
+                    ReceiveAnswers();
+            }
+        }
+
+        protected override void HandleEvent(object evt)
+        {
+            if (evt is ReceiveEvent)
+            {
+                ReceiveEvent e = (ReceiveEvent)evt;
+                HandleBeacon(e.data, e.remoteEndPoint);
+            }
+            else if (evt is System.Exception)
+            {
+                throw (System.Exception)evt;
+            }
+        }
+
         private void SendBeacon(IPEndPoint endPoint)
         {
-            udpClient.Send(new byte[] { 1 }, 1, endPoint);
+            logger.Log("Send beacon...");
+            waiting = true;
+            udpClient.BeginSend(new byte[] { 1 }, 1, endPoint, new System.AsyncCallback(OnSendDone), udpClient);
+        }
+
+        private void OnSendDone(System.IAsyncResult ar)
+        {
+            logger.Log("Send done...");
+            UdpClient client = (UdpClient)ar.AsyncState;
+            client.EndSend(ar);
+            waiting = false;
         }
 
         private void ReceiveAnswers()
         {
-            try
+            logger.Log("Receive answers...");
+            waiting = true;
+            receiveStart = System.DateTime.Now;
+            var t = new Thread(new ThreadStart(BeginReceive));
+            t.Start();
+        }
+
+        private void BeginReceive()
+        {
+            lock (_receive_lock)
             {
-                IPEndPoint remoteEndPoint = null;
-                var buffer = udpClient.Receive(ref remoteEndPoint);
-                HandleBeacon(buffer, remoteEndPoint);
+                try { receiveAsyncResult = udpClient.BeginReceive(new System.AsyncCallback(OnReceiveDone), udpClient); }
+                catch (System.Exception e) { PushEvent(e); }
             }
-            catch (SocketException) {/* timeout is expected to happen */}
+        }
+
+        private void OnReceiveDone(System.IAsyncResult ar)
+        {
+            logger.Log("Receive done...");
+            ReceiveEvent e = new ReceiveEvent();
+            UdpClient client = (UdpClient)ar.AsyncState;
+            e.data = client.EndReceive(ar, ref e.remoteEndPoint);
+            PushEvent(e);
+            waiting = false;
+            lock (_receive_lock)
+            {
+                receiveAsyncResult = null;
+            }
+
+            CheckLeftDevices();
         }
 
         private void HandleBeacon(byte[] message, IPEndPoint endPoint)
@@ -76,10 +160,8 @@ namespace UOS
                 string address = endPoint.Address.ToString();
                 if (!knownAddresses.Contains(address))
                 {
-                    NetworkDevice found = new NetworkDevice(address, port, EthernetConnectionType.TCP);
-                    RaiseDeviceEntered(found);
-                    SendBeacon(endPoint);
                     knownAddresses.Add(address);
+                    RaiseDeviceEntered(new SocketDevice(address, port, EthernetConnectionType.TCP));
                 }
             }
         }
@@ -87,13 +169,15 @@ namespace UOS
         private void CheckLeftDevices()
         {
             System.DateTime now = System.DateTime.Now;
+
             if (now.Subtract(lastCheck).Seconds > 30)
             {
                 SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
+
                 lastAddresses.RemoveWhere(a => knownAddresses.Contains(a));
                 foreach (var address in lastAddresses)
                 {
-                    NetworkDevice left = new NetworkDevice(address, port, EthernetConnectionType.TCP);
+                    SocketDevice left = new SocketDevice(address, port, EthernetConnectionType.TCP);
                     RaiseDeviceLeft(left);
                 }
 

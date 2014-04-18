@@ -11,3 +11,6 @@ unity/[Oo]bj/
 /unity/*.userprefs
 /unity/*.pidb
 /unity/*.booproj
+/unity/*.htm
+/unity/*.DotSettings
+/unity/Assets/UnityVS*

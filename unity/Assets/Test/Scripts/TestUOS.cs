@@ -2,7 +2,7 @@
 using UnityEngine;
 using UOS;
 
-
+[RequireComponent(typeof(uOS))]
 public class TestUOS : MonoBehaviour
 {
     /// <summary>
