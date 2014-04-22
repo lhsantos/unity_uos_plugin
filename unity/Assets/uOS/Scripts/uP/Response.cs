@@ -14,7 +14,7 @@ namespace UOS
             type = Message.Type.SERVICE_CALL_RESPONSE;
         }
 
-        public object getResponseData(string key)
+        public object GetResponseData(string key)
         {
             object data;
             if ((responseData != null) && responseData.TryGetValue(key, out data))
@@ -23,12 +23,12 @@ namespace UOS
                 return null;
         }
 
-        public string getResponseString(string key)
+        public string GetResponseString(string key)
         {
-            return (string)getResponseData(key);
+            return GetResponseData(key) as string;
         }
 
-        public Response addParameter(string key, object value)
+        public Response AddParameter(string key, object value)
         {
             if (responseData == null)
                 responseData = new Dictionary<string, object>();
@@ -63,8 +63,8 @@ namespace UOS
         public override object ToJSON()
         {
             IDictionary<string, object> json = base.ToJSON() as IDictionary<string, object>;
-            if (responseData != null)
-                json["responseData"] = responseData;
+
+            Util.JsonPut(json, "responseData", responseData);
 
             return json;
         }
@@ -74,7 +74,7 @@ namespace UOS
             Response r = new Response();
             Message.FromJSON(r, json);
 
-            r.responseData = Util.JsonOptField((IDictionary<string, object>)json, "responseData") as IDictionary<string, object>;
+            r.responseData = Util.JsonOptField(json as IDictionary<string, object>, "responseData") as IDictionary<string, object>;
 
             return r;
         }

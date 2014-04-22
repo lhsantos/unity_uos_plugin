@@ -11,8 +11,6 @@ namespace UOS
     /// </summary>
     public class UnityMulticastRadar : UnityNetworkRadar
     {
-        private object _receive_lock = new object();
-
         private struct ReceiveEvent
         {
             public IPEndPoint remoteEndPoint;
@@ -29,6 +27,7 @@ namespace UOS
         private bool waiting;
         private System.DateTime receiveStart;
         private System.IAsyncResult receiveAsyncResult = null;
+        private object _receive_lock = new object();
         private System.DateTime lastCheck;
         private HashSet<string> lastAddresses;
         private HashSet<string> knownAddresses = new HashSet<string>();
@@ -81,6 +80,7 @@ namespace UOS
                         {
                             IPEndPoint ep = null;
                             udpClient.EndReceive(receiveAsyncResult, ref ep);
+                            receiveAsyncResult = null;
                             logger.Log("Receive timout!");
                             ReceiveAnswers();
                         }
@@ -97,6 +97,9 @@ namespace UOS
             {
                 ReceiveEvent e = (ReceiveEvent)evt;
                 HandleBeacon(e.data, e.remoteEndPoint);
+
+                SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
+                CheckLeftDevices();
             }
             else if (evt is System.Exception)
             {
@@ -106,14 +109,12 @@ namespace UOS
 
         private void SendBeacon(IPEndPoint endPoint)
         {
-            logger.Log("Send beacon...");
             waiting = true;
             udpClient.BeginSend(new byte[] { 1 }, 1, endPoint, new System.AsyncCallback(OnSendDone), udpClient);
         }
 
         private void OnSendDone(System.IAsyncResult ar)
         {
-            logger.Log("Send done...");
             UdpClient client = (UdpClient)ar.AsyncState;
             client.EndSend(ar);
             waiting = false;
@@ -121,7 +122,6 @@ namespace UOS
 
         private void ReceiveAnswers()
         {
-            logger.Log("Receive answers...");
             waiting = true;
             receiveStart = System.DateTime.Now;
             var t = new Thread(new ThreadStart(BeginReceive));
@@ -130,16 +130,18 @@ namespace UOS
 
         private void BeginReceive()
         {
-            lock (_receive_lock)
+            try
             {
-                try { receiveAsyncResult = udpClient.BeginReceive(new System.AsyncCallback(OnReceiveDone), udpClient); }
-                catch (System.Exception e) { PushEvent(e); }
+                lock (_receive_lock)
+                {
+                    receiveAsyncResult = udpClient.BeginReceive(new System.AsyncCallback(OnReceiveDone), udpClient);
+                }
             }
+            catch (System.Exception e) { PushEvent(e); }
         }
 
         private void OnReceiveDone(System.IAsyncResult ar)
         {
-            logger.Log("Receive done...");
             ReceiveEvent e = new ReceiveEvent();
             UdpClient client = (UdpClient)ar.AsyncState;
             e.data = client.EndReceive(ar, ref e.remoteEndPoint);
@@ -149,8 +151,6 @@ namespace UOS
             {
                 receiveAsyncResult = null;
             }
-
-            CheckLeftDevices();
         }
 
         private void HandleBeacon(byte[] message, IPEndPoint endPoint)
@@ -172,8 +172,6 @@ namespace UOS
 
             if (now.Subtract(lastCheck).Seconds > 30)
             {
-                SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
-
                 lastAddresses.RemoveWhere(a => knownAddresses.Contains(a));
                 foreach (var address in lastAddresses)
                 {

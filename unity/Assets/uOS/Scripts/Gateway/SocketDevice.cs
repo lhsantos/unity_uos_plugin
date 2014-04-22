@@ -1,4 +1,7 @@
-﻿namespace UOS
+﻿using System.Net;
+
+
+namespace UOS
 {
     /// <summary>
     /// What are the possible types of connections over ethernet?
@@ -27,5 +30,8 @@
             this.port = port;
             this.connectionType = connectionType;
         }
+
+        public SocketDevice(IPEndPoint ep, EthernetConnectionType connectionType)
+            : this(ep.Address.ToString(), ep.Port, connectionType) { }
     }
 }

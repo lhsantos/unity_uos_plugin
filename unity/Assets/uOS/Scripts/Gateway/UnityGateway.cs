@@ -14,19 +14,45 @@ namespace UOS
     /// </summary>
     public class UnityGateway : IGateway, IUnityUpdatable
     {
+        private struct ServiceCallEvent
+        {
+            public uOSServiceCallBack callback;
+            public uOSServiceCallInfo info;
+            public Response response;
+            public System.Exception exception;
+        }
+
+        private struct ListenerInfo
+        {
+            public UOSEventListener listener;
+            public UpDevice device;
+            public string driver;
+            public string instanceId;
+            public string eventKey;
+        }
+
         private const string DEVICE_DRIVER_NAME = "uos.DeviceDriver";
         private const string DRIVERS_NAME_KEY = "driversName";
         private const string INTERFACES_KEY = "interfaces";
+        private const string REGISTER_EVENT_LISTENER_EVENT_KEY_PARAMETER = "eventKey";
+        private const string REGISTER_LISTENER_SERVICE = "registerListener";
+        private const string UNREGISTER_LISTENER_SERVICE = "unregisterListener";
+
 
         private uOSSettings settings;
-        private Logger logger = new UnityLogger();
         private IDictionary<string, ChannelManager> channelManagers = null;
         private UpDevice currentDevice = null;
         private DeviceRegistry deviceRegistry = new DeviceRegistry();
         private object _device_reg_lock = new object();
-        private IDictionary<string, object> localDrivers;
+        private GatewayServer server = null;
+        private IDictionary<string, IList<ListenerInfo>> listenerMap = new Dictionary<string, IList<ListenerInfo>>();
+        private Queue<ServiceCallEvent> serviceCallQueue = new Queue<ServiceCallEvent>();
+        private object _service_call_queue_lock = new object();
         private UnityNetworkRadar radar = null;
-        //private DriverRegistry driverRegistry = new DriverRegistry();
+
+
+        public Logger logger { get; private set; }
+        public DriverManager driverManager { get; private set; }
 
 
         /// <summary>
@@ -36,10 +62,12 @@ namespace UOS
         public UnityGateway(uOSSettings uOSSettings)
         {
             this.settings = uOSSettings;
+            this.logger = new UnityLogger();
 
-            PrepareChannelManagers();
+            PrepareChannels();
             PrepareDevice();
             PrepareDrivers();
+            PrepareServer();
             PrepareRadar();
         }
 
@@ -48,6 +76,8 @@ namespace UOS
         /// </summary>
         public void Init()
         {
+            server.Init();
+
             if (radar != null)
                 radar.StartRadar();
         }
@@ -62,6 +92,14 @@ namespace UOS
                 radar.StopRadar();
                 radar = null;
             }
+
+            server.TearDown();
+            server = null;
+
+            foreach (ChannelManager cm in channelManagers.Values)
+                cm.TearDown();
+            channelManagers.Clear();
+            channelManagers = null;
         }
 
         /// <summary>
@@ -70,6 +108,18 @@ namespace UOS
         /// </summary>
         public void Update()
         {
+            // Processes async events...
+            lock (_service_call_queue_lock)
+            {
+                while (serviceCallQueue.Count > 0)
+                {
+                    ServiceCallEvent e = serviceCallQueue.Dequeue();
+                    e.callback(e.info, e.response, e.exception);
+                }
+            }
+
+            // Updates server and radar.
+            server.Update();
             if (radar != null)
                 radar.Update();
         }
@@ -93,6 +143,15 @@ namespace UOS
             {
                 return deviceRegistry.List();
             }
+        }
+
+        public ChannelManager GetChannelManager(string networkDeviceType)
+        {
+            ChannelManager cm = null;
+            if (channelManagers.TryGetValue(networkDeviceType, out cm))
+                return cm;
+
+            return null;
         }
 
         /// <summary>
@@ -190,86 +249,7 @@ namespace UOS
                 RemoteServiceCall(device, serviceCall, streamData, messageContext, callback, state);
         }
 
-
-        private void PrepareChannelManagers()
-        {
-            IPAddress myIP = System.Array.Find<IPAddress>(
-                Dns.GetHostEntry(Dns.GetHostName()).AddressList,
-                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-
-            channelManagers = new Dictionary<string, ChannelManager>();
-            channelManagers["Ethernet:UDP"] = new UDPChannelManager(myIP, settings.eth.udp.port);
-            channelManagers["Ethernet:TCP"] = new TCPChannelManager(myIP, settings.eth.tcp.port);
-        }
-
-        private void PrepareDevice()
-        {
-            currentDevice = new UpDevice();
-
-            if (settings.deviceName != null)
-            {
-                string name = settings.deviceName.Trim();
-                if (name.Length > 0)
-                    currentDevice.name = name;
-            }
-            else
-                currentDevice.name = Dns.GetHostName();
-
-            if ((currentDevice.name == null) || (currentDevice.name == "localhost"))
-                currentDevice.name = "unity" + (new System.Random()).Next();
-
-            currentDevice.AddProperty("platform", "unity: " + Application.platform.ToString().ToLower());
-
-            IList<UpNetworkInterface> networks = new List<UpNetworkInterface>();
-            foreach (ChannelManager cm in channelManagers.Values)
-            {
-                NetworkDevice nd = cm.GetAvailableNetworkDevice();
-                UpNetworkInterface nInf = new UpNetworkInterface();
-                nInf.netType = nd.networkDeviceType;
-                nInf.networkAddress = GetHost(nd.networkDeviceName);
-                networks.Add(nInf);
-            }
-
-            currentDevice.networks = networks;
-        }
-
-        private void PrepareDrivers()
-        {
-            localDrivers = new Dictionary<string, object>();
-        }
-
-        private void PrepareRadar()
-        {
-            switch (settings.radarType)
-            {
-                case RadarType.MULTICAST:
-                    radar = new UnityMulticastRadar(logger);
-                    break;
-
-                default:
-                    break;
-            }
-
-            if (radar != null)
-                radar.DevicesChanged += OnRadarEvent;
-        }
-
-        private void OnRadarEvent(object sender, RadarEvent type, SocketDevice device)
-        {
-            logger.Log(type.ToString() + ": " + device.networkDeviceName);
-            switch (type)
-            {
-                case RadarEvent.DEVICE_ENTERED:
-                    DeviceEntered(device);
-                    break;
-
-                case RadarEvent.DEVICE_LEFT:
-                    DeviceLeft(device);
-                    break;
-            }
-        }
-
-        private void DeviceEntered(SocketDevice device)
+        public void DeviceEntered(NetworkDevice device)
         {
             if (device == null)
                 return;
@@ -300,11 +280,11 @@ namespace UOS
                 logger.Log("Already known device " + device.networkDeviceName);
         }
 
-        private void DeviceLeft(NetworkDevice device)
+        public void DeviceLeft(NetworkDevice device)
         {
         }
 
-        private void RegisterDevice(UpDevice device)
+        public void RegisterDevice(UpDevice device)
         {
             lock (_device_reg_lock)
             {
@@ -312,7 +292,7 @@ namespace UOS
             }
         }
 
-        private UpDevice RetrieveDevice(string deviceName)
+        public UpDevice RetrieveDevice(string deviceName)
         {
             lock (_device_reg_lock)
             {
@@ -320,7 +300,7 @@ namespace UOS
             }
         }
 
-        private UpDevice RetrieveDevice(string networkAddress, string networkType)
+        public UpDevice RetrieveDevice(string networkAddress, string networkType)
         {
             IList<UpDevice> list = null;
             lock (_device_reg_lock)
@@ -341,6 +321,200 @@ namespace UOS
 
             return null;
         }
+
+        public void HandleNotify(Notify notify, UpDevice device)
+        {
+            if ((notify == null) || (notify.eventKey == null) || (notify.eventKey.Length == 0))
+                logger.Log("No information in notify to handle.");
+
+            if ((listenerMap == null) || (listenerMap.Count == 0))
+            {
+                logger.Log("No listeners waiting for notify events.");
+                return;
+            }
+
+            //Notifying listeners from more specific to more general entries
+            string eventIdentifier;
+            IList<ListenerInfo> listeners;
+
+            // First full entries (device, driver, event, intanceId)
+            eventIdentifier = GetEventIdentifier(device, notify.driver, notify.instanceId, notify.eventKey);
+            if (listenerMap.TryGetValue(eventIdentifier, out listeners))
+                HandleNotify(notify, listeners, eventIdentifier);
+
+            // After less general entries (device, driver, event)
+            eventIdentifier = GetEventIdentifier(device, notify.driver, null, notify.eventKey);
+            if (listenerMap.TryGetValue(eventIdentifier, out listeners))
+                HandleNotify(notify, listeners, eventIdentifier);
+
+            // An then the least general entries (driver, event)
+            eventIdentifier = GetEventIdentifier(null, notify.driver, null, notify.eventKey);
+            if (listenerMap.TryGetValue(eventIdentifier, out listeners))
+                HandleNotify(notify, listeners, eventIdentifier);
+        }
+
+        private void HandleNotify(Notify notify, IList<ListenerInfo> listeners, string eventIdentifier)
+        {
+            if ((listeners == null) || (listeners.Count == 0))
+            {
+                logger.Log("No listeners waiting for notify events for the key '" + eventIdentifier + "'.");
+                return;
+            }
+
+            foreach (ListenerInfo li in listeners)
+            {
+                if (li.listener != null)
+                    li.listener.HandleEvent(notify);
+            }
+        }
+
+        private static string GetEventIdentifier(UpDevice device, string driver, string instanceId, string eventKey)
+        {
+            StringBuilder id = new StringBuilder();
+
+            if ((device != null) && (device.name != null) && (device.name.Length > 0))
+                id.Append("@" + device.name);
+
+            if ((driver != null) && (driver.Length > 0))
+                id.Append("*" + driver);
+
+            if ((eventKey != null) && (eventKey.Length > 0))
+                id.Append("." + eventKey);
+
+            if ((instanceId != null) && (instanceId.Length > 0))
+                id.Append("#" + instanceId);
+
+            return id.ToString();
+        }
+
+        public NetworkDevice GetAvailableNetworkDevice(string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.GetAvailableNetworkDevice();
+        }
+
+        public ClientConnection OpenActiveConnection(string networkDeviceName, string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.OpenActiveConnection(networkDeviceName);
+        }
+
+        public ClientConnection OpenPassiveConnection(string networkDeviceName, string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.OpenPassiveConnection(networkDeviceName);
+        }
+
+        public static string GetHost(string networkDeviceName)
+        {
+            return networkDeviceName.Split(':')[0];
+        }
+
+        public static string GetChannelID(string networkDeviceName)
+        {
+            return networkDeviceName.Split(':')[1];
+        }
+
+
+        private void PrepareChannels()
+        {
+            IPAddress myIP = System.Array.Find<IPAddress>(
+                Dns.GetHostEntry(Dns.GetHostName()).AddressList,
+                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+
+            channelManagers = new Dictionary<string, ChannelManager>();
+            channelManagers["Ethernet:UDP"] = new UDPChannelManager(myIP, settings.eth.udp.port, settings.eth.udp.passivePortRange);
+            channelManagers["Ethernet:TCP"] = new TCPChannelManager(myIP, settings.eth.tcp.port, settings.eth.tcp.passivePortRange);
+        }
+
+        private void PrepareDevice()
+        {
+            currentDevice = new UpDevice();
+
+            if (settings.deviceName != null)
+            {
+                string name = settings.deviceName.Trim();
+                if (name.Length > 0)
+                    currentDevice.name = name;
+            }
+            else
+                currentDevice.name = Dns.GetHostName();
+
+            if ((currentDevice.name == null) || (currentDevice.name == "localhost"))
+                currentDevice.name = System.Environment.MachineName.ToLower() + "-unity";
+
+            currentDevice.AddProperty("platform", "unity: " + Application.platform.ToString().ToLower());
+
+            IList<UpNetworkInterface> networks = new List<UpNetworkInterface>();
+            foreach (ChannelManager cm in channelManagers.Values)
+            {
+                NetworkDevice nd = cm.GetAvailableNetworkDevice();
+                UpNetworkInterface nInf = new UpNetworkInterface();
+                nInf.netType = nd.networkDeviceType;
+                nInf.networkAddress = GetHost(nd.networkDeviceName);
+                networks.Add(nInf);
+            }
+
+            currentDevice.networks = networks;
+        }
+
+        private void PrepareDrivers()
+        {
+            driverManager = new DriverManager(settings, this);
+
+            DeviceDriver dd = new DeviceDriver();
+            driverManager.DeployDriver(dd.GetDriver(), dd);
+        }
+
+        private void PrepareServer()
+        {
+            server = new GatewayServer(this);
+        }
+
+        private void PrepareRadar()
+        {
+            switch (settings.radarType)
+            {
+                case RadarType.MULTICAST:
+                    radar = new UnityMulticastRadar(logger);
+                    break;
+
+                default:
+                    break;
+            }
+
+            if (radar != null)
+                radar.DevicesChanged += OnRadarEvent;
+        }
+
+        private void PushEvent(uOSServiceCallBack callback, uOSServiceCallInfo info, Response r, System.Exception e)
+        {
+            PushEvent(new ServiceCallEvent { callback = callback, info = info, response = r, exception = e });
+        }
+
+        private void PushEvent(ServiceCallEvent e)
+        {
+            lock (_service_call_queue_lock)
+            {
+                serviceCallQueue.Enqueue(e);
+            }
+        }
+
+        private void OnRadarEvent(object sender, RadarEvent type, SocketDevice device)
+        {
+            logger.Log(type.ToString() + ": " + device.networkDeviceName);
+            switch (type)
+            {
+                case RadarEvent.DEVICE_ENTERED:
+                    DeviceEntered(device);
+                    break;
+
+                case RadarEvent.DEVICE_LEFT:
+                    DeviceLeft(device);
+                    break;
+            }
+        }
+
         //private void DoDriversRegistry(NetworkDevice device, UpDevice upDevice)
         //{
         //    Response response = CallService(upDevice, new Call(DEVICE_DRIVER_NAME, "listDrivers"));
@@ -388,10 +562,10 @@ namespace UOS
                 call,
                 delegate(uOSServiceCallInfo info, Response response, System.Exception e)
                 {
-                    if ((e != null) && (response != null) && (response.error == null || (response.error.Length == 0)))
+                    if ((e == null) && (response != null) && ((response.error == null) || (response.error.Length == 0)))
                     {
                         // in case of a success greeting process, register the device in the neighborhood database
-                        object responseDevice = response.getResponseData("device");
+                        object responseDevice = response.GetResponseData("device");
                         if (responseDevice != null)
                         {
                             UpDevice remoteDevice;
@@ -401,6 +575,7 @@ namespace UOS
                                 remoteDevice = UpDevice.FromJSON(responseDevice);
 
                             RegisterDevice(remoteDevice);
+                            logger.LogError("Successfully handshaked with device '" + device.networkDeviceName + "'.");
                         }
                         else
                             logger.LogError("Not possible complete handshake with device '" + device.networkDeviceName + "' for no device on the handshake response.");
@@ -438,39 +613,51 @@ namespace UOS
                 throw new System.Exception("Couldn't connect to target.");
 
             uOSServiceCallInfo info = new uOSServiceCallInfo { device = device, call = serviceCall, asyncState = state };
-            byte[] data = Encoding.UTF8.GetBytes(Json.Serialize(serviceCall.ToJSON()));
+            string call = Json.Serialize(serviceCall.ToJSON()) + "\n";
+            Debug.Log(call);
+            byte[] data = Encoding.UTF8.GetBytes(call);
 
             con.WriteAsync(
                 data,
                 new ClientConnection.WriteCallback(
-                    delegate(int bytesWriten, object callerState, System.Exception e)
+                    delegate(int bytesWriten, object callerState, System.Exception writeException)
                     {
-                        if (e != null)
-                            callback(info, null, e);
+                        if (writeException != null)
+                        {
+                            con.Close();
+
+                            PushEvent(callback, info, null, writeException);
+                        }
                         else
                         {
                             con.ReadAsync(
                                 new ClientConnection.ReadCallback(
-                                    delegate(byte[] bytes, object ce, System.Exception ex)
+                                    delegate(byte[] bytes, object ce, System.Exception readException)
                                     {
                                         con.Close();
 
                                         Response r = null;
                                         string returnedMessage = null;
-                                        if (ex == null)
+                                        if (readException == null)
                                         {
                                             if (bytes != null)
                                                 returnedMessage = Encoding.UTF8.GetString(bytes);
                                             if (returnedMessage != null)
                                             {
-                                                r = Response.FromJSON(Json.Deserialize(returnedMessage));
-                                                r.messageContext = messageContext;
+                                                try
+                                                {
+                                                    r = Response.FromJSON(Json.Deserialize(returnedMessage));
+                                                    r.messageContext = messageContext;
+                                                }
+                                                catch (System.Exception jsonException)
+                                                {
+                                                    readException = jsonException;
+                                                }
                                             }
                                             else
-                                                ex = new System.Exception("No response received from call.");
+                                                readException = new System.Exception("No response received from call.");
                                         }
-
-                                        callback(info, r, ex);
+                                        PushEvent(callback, info, r, readException);
                                     }
                                 ),
                                 callerState
@@ -523,7 +710,7 @@ namespace UOS
             if (streamData != null)
             {
                 foreach (var s in streamData)
-                    s.thread.Interrupt();
+                    s.thread.Abort();
             }
         }
 
@@ -591,36 +778,6 @@ namespace UOS
 
             return compatibleNetworks[0];
         }
-
-        public NetworkDevice GetAvailableNetworkDevice(string networkDeviceType)
-        {
-            ChannelManager channelManager = null;
-            if (channelManagers.TryGetValue(networkDeviceType, out channelManager))
-                return channelManager.GetAvailableNetworkDevice();
-
-            return null;
-        }
-
-        private ClientConnection OpenActiveConnection(string networkDeviceName, string networkDeviceType)
-        {
-            return channelManagers[networkDeviceType].OpenActiveConnection(networkDeviceName);
-        }
-
-        private ClientConnection OpenPassiveConnection(string networkDeviceName, string networkDeviceType)
-        {
-            return channelManagers[networkDeviceType].OpenPassiveConnection(networkDeviceName);
-        }
-
-        private static string GetChannelID(string networkDeviceName)
-        {
-            return networkDeviceName.Split(':')[1];
-        }
-
-        private static string GetHost(string networkDeviceName)
-        {
-            return networkDeviceName.Split(':')[0];
-        }
-
 
         /// <summary>
         /// Inner class for waiting a connection in case of stream service type.

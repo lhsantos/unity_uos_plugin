@@ -87,7 +87,7 @@ namespace UOS
         {
             IDictionary<string, object> json = new Dictionary<string, object>();
 
-            json["name"] = name;
+            Util.JsonPut(json, "name", name);
 
             AddServices(json, "services", this.services);
             AddServices(json, "events", this.events);
@@ -119,7 +119,7 @@ namespace UOS
         public static UpDriver FromJSON(object obj)
         {
             IDictionary<string, object> json = obj as IDictionary<string, object>;
-            UpDriver d = new UpDriver(Util.JsonOptField(json, "name") as string);
+            UpDriver d = new UpDriver(Util.JsonOptString(json, "name"));
 
             d.services = ServicesFromJSON(json, "services");
             d.events = ServicesFromJSON(json, "events");

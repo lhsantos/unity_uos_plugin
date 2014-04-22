@@ -29,15 +29,15 @@ namespace UOS
         {
             var json = new Dictionary<string, object>();
 
-            json["type"] = type.ToString();
-            json["error"] = error;
+            Util.JsonPut(json, "type", type.ToString());
+            Util.JsonPut(json, "error", error);
 
             return json;
         }
 
         public static void FromJSON(Message msg, object json)
         {
-            msg.error = Util.JsonOptField(json as IDictionary<string, object>, "error") as string;
+            msg.error = Util.JsonOptString(json as IDictionary<string, object>, "error");
         }
 
         public override string ToString()

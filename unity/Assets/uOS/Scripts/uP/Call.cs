@@ -139,16 +139,15 @@ namespace UOS
         {
             IDictionary<string, object> json = base.ToJSON() as IDictionary<string, object>;
 
-            json["driver"] = driver;
-            json["service"] = service;
-            if (parameters != null)
-                json["parameters"] = parameters;
-            json["instanceId"] = instanceId;
-            json["serviceType"] = serviceType.ToString();
-            json["channels"] = channels;
-            json["channelIDs"] = channelIDs;
-            json["channelType"] = channelType;
-            json["securityType"] = securityType;
+            Util.JsonPut(json, "driver", driver);
+            Util.JsonPut(json, "service", service);
+            Util.JsonPut(json, "parameters", parameters);
+            Util.JsonPut(json, "instanceId", instanceId);
+            Util.JsonPut(json, "serviceType", serviceType.ToString());
+            Util.JsonPut(json, "channels", channels);
+            Util.JsonPut(json, "channelIDs", channelIDs);
+            Util.JsonPut(json, "channelType", channelType);
+            Util.JsonPut(json, "securityType", securityType);
 
             return json;
         }
@@ -160,16 +159,12 @@ namespace UOS
 
             IDictionary<string, object> json = jsonObj as IDictionary<string, object>;
 
-            call.driver = Util.JsonOptField(json, "driver") as string;
-            call.service = Util.JsonOptField(json, "service") as string;
+            call.driver = Util.JsonOptString(json, "driver");
+            call.service = Util.JsonOptString(json, "service");
             call.parameters = Util.JsonOptField(json, "parameters") as IDictionary<string, object>;
-            call.instanceId = Util.JsonOptField(json, "instanceId") as string;
-
-            string aux = Util.JsonOptField(json, "serviceType") as string;
-            if (aux != null)
-                call.serviceType = (ServiceType)System.Enum.Parse(typeof(ServiceType), aux, true);
-
-            call.channels = (int)Util.JsonOptField(json, "channels");
+            call.instanceId = Util.JsonOptString(json, "instanceId");
+            call.serviceType = Util.JsonOptEnum<ServiceType>(json, "serviceType", call.serviceType);
+            call.channels = Util.JsonOptInt(json, "channels", call.channels);
 
             IList<string> ids = Util.JsonOptField(json, "channelIDs") as IList<string>;
             if (ids != null)
@@ -178,8 +173,8 @@ namespace UOS
                 ids.CopyTo(call.channelIDs, 0);
             }
 
-            call.channelType = Util.JsonOptField(json, "channelType") as string;
-            call.securityType = Util.JsonOptField(json, "securityType") as string;
+            call.channelType = Util.JsonOptString(json, "channelType");
+            call.securityType = Util.JsonOptString(json, "securityType");
 
             return call;
         }

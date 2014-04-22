@@ -55,7 +55,7 @@ namespace UOS
         {
             IDictionary<string, object> json = new Dictionary<string, object>();
 
-            json["name"] = name;
+            Util.JsonPut(json, "name", name);
             AddParameters(json, "parameters");
 
             return json;
@@ -63,13 +63,12 @@ namespace UOS
 
         private void AddParameters(IDictionary<string, object> json, string propName)
         {
-            IDictionary<string, object> j_params = new Dictionary<string, object>();
-            json[propName] = j_params;
-
             if (parameters != null)
             {
+                IDictionary<string, object> j_params = new Dictionary<string, object>();
                 foreach (var p in parameters)
                     j_params[p.Key] = p.Value.ToString();
+                json[propName] = j_params;
             }
         }
 
@@ -78,7 +77,7 @@ namespace UOS
             IDictionary<string, object> json = obj as IDictionary<string, object>;
             UpService s = new UpService();
 
-            s.name = json["name"] as string;
+            s.name = Util.JsonOptString(json, "name");
 
             IDictionary<string, object> p_map = Util.JsonOptField(json, "parameters") as IDictionary<string, object>;
             if (p_map != null)

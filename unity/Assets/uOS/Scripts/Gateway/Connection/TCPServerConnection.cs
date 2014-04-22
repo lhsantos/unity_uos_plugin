@@ -1,21 +1,41 @@
-﻿namespace UOS
+﻿using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+
+
+namespace UOS
 {
     public class TCPServerConnection : ServerConnection
     {
+        private TcpListener tcpListener;
+        private bool running;
 
         public TCPServerConnection(SocketDevice networkDevice)
             : base(networkDevice)
         {
+            tcpListener = new TcpListener(IPAddress.Parse(networkDevice.host), networkDevice.port);
+            tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            tcpListener.Start();
+            running = true;
         }
 
         public override ClientConnection Accept()
         {
-            throw new System.NotImplementedException();
+            while (running)
+            {
+                if (tcpListener.Pending())
+                    return new TCPClientConnection(tcpListener.AcceptTcpClient());
+                else
+                    Thread.Sleep(100);
+            }
+
+            return null;
         }
 
         public override void Close()
         {
-            throw new System.NotImplementedException();
+            running = false;
+            tcpListener.Stop();
         }
     }
 }

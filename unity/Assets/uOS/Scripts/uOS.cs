@@ -41,7 +41,6 @@ namespace UOS
 
         public static IGateway gateway { get { return readyInstance._gateway; } }
 
-
         private bool _ready;
         private UnityGateway _gateway;
 
@@ -50,16 +49,24 @@ namespace UOS
             if (_instance == null)
                 _instance = this;
             else
-                Debug.LogError("The scene must not contain more than one instance of uOS");
+                throw new System.InvalidOperationException("The scene must not contain more than one instance of uOS");
+        }
+
+        void OnDisable()
+        {
+            CheckDestroy();
         }
 
         void OnDestroy()
         {
+            CheckDestroy();
+        }
+
+        private void CheckDestroy()
+        {
             if (_instance == this)
             {
-                if (ready)
-                    TearDown();
-
+                TearDown();
                 _instance = null;
             }
         }
@@ -68,6 +75,8 @@ namespace UOS
         {
             if (!ready)
             {
+                Debug.Log("uOS init");
+
                 _instance._gateway = new UnityGateway(settings);
                 _instance._gateway.Init();
 
@@ -81,6 +90,8 @@ namespace UOS
         {
             if (ready)
             {
+                Debug.Log("uOS tear down");
+
                 _instance._gateway.TearDown();
                 _instance._gateway = null;
 
@@ -93,10 +104,7 @@ namespace UOS
         void Update()
         {
             if (instance != this)
-            {
-                Debug.LogError("This is not the valid instance of uOS, you can't use more than one!");
-                return;
-            }
+                throw new System.InvalidOperationException("This is not the valid instance of uOS, you can't use more than one!");
 
             if (_ready)
             {

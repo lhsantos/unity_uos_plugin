@@ -6,32 +6,57 @@ namespace UOS
 {
     public class TCPChannelManager : ChannelManager
     {
-        private SocketDevice device;
+        private int defaultPort;
+        private IList<NetworkDevice> passiveDevices = new List<NetworkDevice>();
+        private int passiveIndex = 0;
         private IDictionary<string, TCPServerConnection> startedServers = new Dictionary<string, TCPServerConnection>();
 
-        public TCPChannelManager(IPAddress localHost, string portRange)
+        public TCPChannelManager(IPAddress localIP, int defaultPort, string portRange)
         {
-            device = new SocketDevice(
-                localHost.ToString(),
-                int.Parse(portRange.Split('-')[0]),
-                EthernetConnectionType.TCP
-            );
+            this.defaultPort = defaultPort;
+
+            int lowerPort, upperPort;
+            try
+            {
+                string[] range = portRange.Split('-');
+                lowerPort = int.Parse(range[0]);
+                upperPort = int.Parse(range[1]);
+
+                if (upperPort < lowerPort)
+                {
+                    lowerPort = upperPort = defaultPort;
+                }
+            }
+            catch (System.Exception)
+            {
+                lowerPort = upperPort = defaultPort;
+            }
+
+            string localHost = localIP.ToString();
+            passiveDevices.Add(new SocketDevice(localHost, defaultPort, EthernetConnectionType.TCP));
+            for (int i = lowerPort; i <= upperPort; ++i)
+                passiveDevices.Add(new SocketDevice(localHost, i, EthernetConnectionType.TCP));
         }
 
         public string GetNetworkDeviceType()
         {
-            return device.networkDeviceType;
+            return passiveDevices[0].networkDeviceType;
         }
 
         public ClientConnection OpenActiveConnection(string networkDeviceName)
         {
             string[] address = networkDeviceName.Split(':');
 
-            if (address.Length != 2)
+            string host;
+            int port;
+            if (address.Length == 1)
+                port = defaultPort;
+            else if (address.Length == 2)
+                port = int.Parse(address[1]);
+            else
                 throw new System.ArgumentException("Invalid parameters for creation of the channel.");
 
-            string host = address[0];
-            int port = int.Parse(address[1]);
+            host = address[0];
 
             return new TCPClientConnection(host, port);
         }
@@ -56,9 +81,22 @@ namespace UOS
             return server.Accept();
         }
 
+        public IList<NetworkDevice> ListNetworkDevices()
+        {
+            return new List<NetworkDevice>(passiveDevices);
+        }
+
         public NetworkDevice GetAvailableNetworkDevice()
         {
+            NetworkDevice device = passiveDevices[passiveIndex];
+            passiveIndex = (passiveIndex + 1) % passiveDevices.Count;
             return device;
+        }
+
+        public void TearDown()
+        {
+            foreach (var s in startedServers.Values)
+                s.Close();
         }
     }
 }

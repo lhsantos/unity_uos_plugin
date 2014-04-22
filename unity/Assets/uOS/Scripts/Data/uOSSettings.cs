@@ -85,7 +85,7 @@ namespace UOS
     public class uOSTCPSettings
     {
         //ubiquitos.eth.tcp.port=14984
-        public string port = "14984";
+        public int port = 14984;
 
         //ubiquitos.eth.tcp.passivePortRange=14985-15000
         public string passivePortRange = "14985-15000";
@@ -97,7 +97,7 @@ namespace UOS
     public class uOSUDPSettings
     {
         //ubiquitos.eth.udp.port=15001
-        public string port = "15001";
+        public int port = 15001;
 
         //ubiquitos.eth.udp.passivePortRange=15002-15017
         public string passivePortRange = "15002-15017";

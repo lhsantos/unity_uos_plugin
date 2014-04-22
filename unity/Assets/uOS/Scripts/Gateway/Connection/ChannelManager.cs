@@ -1,4 +1,7 @@
-﻿namespace UOS
+﻿using System.Collections.Generic;
+
+
+namespace UOS
 {
     public interface ChannelManager
     {
@@ -8,6 +11,10 @@
 
         ClientConnection OpenActiveConnection(string networkDeviceName);
 
+        IList<NetworkDevice> ListNetworkDevices();
+
         NetworkDevice GetAvailableNetworkDevice();
+
+        void TearDown();
     }
 }

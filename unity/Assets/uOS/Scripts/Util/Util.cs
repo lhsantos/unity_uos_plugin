@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 
 
 namespace UOS
@@ -42,6 +43,14 @@ namespace UOS
             return (a != null && a.Equals(b));
         }
 
+        public static void JsonPut(IDictionary<string, object> json, string key, object val)
+        {
+            if (val == null)
+                json.Remove(key);
+            else
+                json[key] = val;
+        }
+
         public static object JsonOptField(IDictionary<string, object> json, string field)
         {
             object obj = null;
@@ -49,6 +58,96 @@ namespace UOS
                 return obj;
 
             return null;
+        }
+
+        public static string JsonOptString(IDictionary<string, object> json, string field, string defaultValue = null)
+        {
+            try
+            {
+                return JsonOptField(json, field) as string;
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
+
+        public static int JsonOptInt(IDictionary<string, object> json, string field, int defaultValue)
+        {
+            try
+            {
+                object obj = null;
+                if (json.TryGetValue(field, out obj))
+                {
+                    if (obj is Int64)
+                        return (int)(Int64)obj;
+                    else if (obj is Int32)
+                        return (int)(Int32)obj;
+                    else if (obj is string)
+                        return int.Parse(obj as string);
+                }
+            }
+            catch { }
+
+            return defaultValue;
+        }
+
+        public static T JsonOptEnum<T>(IDictionary<string, object> json, string field, T defaultValue) where T : struct, IConvertible
+        {
+            Type type = typeof(T);
+
+            if (!type.IsEnum)
+                throw new InvalidOperationException("Enum type expected!");
+
+            try
+            {
+                object obj = null;
+                if (json.TryGetValue(field, out obj))
+                    return (T)Enum.Parse(type, obj as string, true);
+            }
+            catch { }
+
+            return defaultValue;
+        }
+
+        public static string JsonStructure(object json, string ident = "")
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.Append(ident);
+            if (json is IDictionary<string, object>)
+            {
+                builder.Append("{\n");
+                IDictionary<string, object> dic = json as IDictionary<string, object>;
+                foreach (var pair in dic)
+                {
+                    builder.Append(ident);
+                    builder.Append("\t");
+                    builder.Append(pair.Key);
+                    builder.Append(":\n");
+                    builder.Append(JsonStructure(pair.Value, ident + "\t\t"));
+                    builder.Append("\n");
+                }
+                builder.Append(ident);
+                builder.Append("}");
+            }
+            else if (json is IList<object>)
+            {
+                builder.Append("[\n");
+                IList<object> list = json as IList<object>;
+                for (int i = 0; i < list.Count; ++i)
+                {
+                    builder.Append(JsonStructure(list[i], ident + "  "));
+                    if (i < list.Count - 1)
+                        builder.Append(",");
+                    builder.Append("\n");
+                }
+                builder.Append(ident);
+                builder.Append("]");
+            }
+            else
+                builder.Append(json.ToString());
+
+            return builder.ToString();
         }
     }
 }

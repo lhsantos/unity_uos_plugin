@@ -22,6 +22,16 @@ namespace UOS
             udpClient.Connect(peerAddress);
         }
 
+        public override int Read(byte[] buffer, int offset, int size)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int size)
+        {
+            throw new System.NotImplementedException();
+        }
+
         public override void ReadAsync(ClientConnection.ReadCallback callback, object callerState)
         {
             Thread t = new Thread(new ThreadStart(

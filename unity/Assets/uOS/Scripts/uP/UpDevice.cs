@@ -73,18 +73,18 @@ namespace UOS
         {
             IDictionary<string, object> json = new Dictionary<string, object>();
 
-            json["name"] = name;
+            Util.JsonPut(json, "name", name);
 
             if (networks != null)
             {
                 IList<object> j_networks = new List<object>();
                 foreach (var ni in networks)
                     j_networks.Add(ni.ToJSON());
-                json["networks"] = j_networks;
+                Util.JsonPut(json, "networks", j_networks);
             }
 
             if (meta != null)
-                json["meta"] = meta;
+                Util.JsonPut(json, "meta", meta);
 
             return json;
         }
@@ -94,8 +94,8 @@ namespace UOS
             IDictionary<string, object> dict = json as IDictionary<string, object>;
 
             UpDevice device = new UpDevice();
-            device.name = Util.JsonOptField(dict, "name") as string;
-            device.networks = FromNetworks(dict, "networks");
+            device.name = Util.JsonOptString(dict, "name");
+            device.networks = FromNetworks(dict);
             device.meta = FromMeta(dict);
 
             return device;
@@ -105,14 +105,19 @@ namespace UOS
         {
             object meta = Util.JsonOptField(json, "meta");
             if (meta != null)
-                return new Dictionary<string, string>(meta as IDictionary<string, string>);
+            {
+                IDictionary<string, string> dest = new Dictionary<string, string>();
+                foreach (var pair in meta as IDictionary<string, object>)
+                    dest[pair.Key] = pair.Value as string;
+                return dest;
+            }
 
             return null;
         }
 
-        private static IList<UpNetworkInterface> FromNetworks(IDictionary<string, object> json, string propName)
+        private static IList<UpNetworkInterface> FromNetworks(IDictionary<string, object> json)
         {
-            object obj = Util.JsonOptField(json, propName);
+            object obj = Util.JsonOptField(json, "networks");
             if (obj != null)
             {
                 IList<object> j_networks = obj as IList<object>;

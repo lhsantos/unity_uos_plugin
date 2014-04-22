@@ -6,21 +6,41 @@ namespace UOS
 {
     public class UDPChannelManager : ChannelManager
     {
-        private SocketDevice device;
+        private int defaultPort;
+        private IList<NetworkDevice> passiveDevices = new List<NetworkDevice>();
+        private int passiveIndex = 0;
         private IDictionary<string, UDPServerConnection> startedServers = new Dictionary<string, UDPServerConnection>();
 
-        public UDPChannelManager(IPAddress localHost, string portRange)
+        public UDPChannelManager(IPAddress localIP, int defaultPort, string portRange)
         {
-            device = new SocketDevice(
-                localHost.ToString(),
-                int.Parse(portRange.Split('-')[0]),
-                EthernetConnectionType.UDP
-            );
+            this.defaultPort = defaultPort;
+
+            int lowerPort, upperPort;
+            try
+            {
+                string[] range = portRange.Split('-');
+                lowerPort = int.Parse(range[0]);
+                upperPort = int.Parse(range[1]);
+
+                if (upperPort < lowerPort)
+                {
+                    lowerPort = upperPort = defaultPort;
+                }
+            }
+            catch (System.Exception)
+            {
+                lowerPort = upperPort = defaultPort;
+            }
+
+            string localHost = localIP.ToString();
+            passiveDevices.Add(new SocketDevice(localHost, defaultPort, EthernetConnectionType.UDP));
+            for (int i = lowerPort; i <= upperPort; ++i)
+                passiveDevices.Add(new SocketDevice(localHost, i, EthernetConnectionType.UDP));
         }
 
         public string GetNetworkDeviceType()
         {
-            return device.networkDeviceType;
+            return passiveDevices[0].networkDeviceType;
         }
 
         public ClientConnection OpenActiveConnection(string networkDeviceName)
@@ -56,9 +76,22 @@ namespace UOS
             return server.Accept();
         }
 
+        public IList<NetworkDevice> ListNetworkDevices()
+        {
+            return new List<NetworkDevice>(passiveDevices);
+        }
+
         public NetworkDevice GetAvailableNetworkDevice()
         {
+            NetworkDevice device = passiveDevices[passiveIndex];
+            passiveIndex = (passiveIndex + 1) % passiveDevices.Count;
             return device;
+        }
+
+        public void TearDown()
+        {
+            foreach (var s in startedServers.Values)
+                s.Close();
         }
     }
 }
