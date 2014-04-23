@@ -1,8 +1,8 @@
 ##Unity uOS Plugin##
 
-This is a very restricted port of the [uOS middleware](https://github.com/UnBiquitous/uos_core) as plugin for [Unity](http://unity3d.com) game engine. This port intends to enable basic communication between Unity games and a uOS-based ubiquitous smartspace. The following description assumes you are familiar with Unity environment and script programming, if you are not, please refer to their [documentation](http://unity3d.com/learn) for details before using this plugin.
+This is a very restricted port of the [uOS middleware](https://github.com/UnBiquitous/uos_core) as a plugin for the [Unity](http://unity3d.com) game engine. This port intends to enable basic communication between Unity games and a uOS-based ubiquitous smartspace. The following description assumes you are familiar with Unity environment and script programming, if you are not, please refer to their [documentation](http://unity3d.com/learn) for details before using this plugin.
 
-** This plugin was coded in C# **
+**This plugin was coded in C#**
 
 ##Before you continue!##
 
