@@ -5,8 +5,10 @@ using System.Net.Sockets;
 
 
 [RequireComponent(typeof(uOS))]
-public class TestUOS : MonoBehaviour
+public class TestUOS : MonoBehaviour, Logger
 {
+    string myLog = "";
+
     /// <summary>
     /// Called right before the first update.
     /// </summary>
@@ -18,7 +20,7 @@ public class TestUOS : MonoBehaviour
         //Debug.Log("aceitou!");
         //client.Close();
         //tcpListener.Stop();
-        uOS.Init();
+        uOS.Init(this);
     }
 
     /// <summary>
@@ -26,5 +28,37 @@ public class TestUOS : MonoBehaviour
     /// </summary>
     void Update()
     {
+    }
+
+    void OnGUI()
+    {
+        myLog = GUI.TextArea(new Rect(10, 10, Screen.width - 10, Screen.height - 10), myLog);
+    }
+
+
+
+    public void Log(object message)
+    {
+        DoLog(message.ToString());
+    }
+
+    public void LogError(object message)
+    {
+        DoLog("ERROR: " + message);
+    }
+
+    public void LogException(System.Exception exception)
+    {
+        DoLog("ERROR: " + exception.StackTrace);
+    }
+
+    public void LogWarning(object message)
+    {
+        DoLog("WARNING: " + message);
+    }
+
+    private void DoLog(string msg)
+    {
+        myLog = msg + "\n" + myLog;
     }
 }

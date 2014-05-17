@@ -59,10 +59,10 @@ namespace UOS
         /// Creates a new Gateway with given settings.
         /// </summary>
         /// <param name="uOSSettings"></param>
-        public UnityGateway(uOSSettings uOSSettings)
+        public UnityGateway(uOSSettings uOSSettings, Logger logger)
         {
             this.settings = uOSSettings;
-            this.logger = new UnityLogger();
+            this.logger = logger;
 
             PrepareChannels();
             PrepareDevice();
@@ -405,6 +405,13 @@ namespace UOS
             return cm == null ? null : cm.OpenPassiveConnection(networkDeviceName);
         }
 
+        public static IPAddress GetLocalIP()
+        {
+            return System.Array.Find<IPAddress>(
+                Dns.GetHostEntry(Dns.GetHostName()).AddressList,
+                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+        }
+
         public static string GetHost(string networkDeviceName)
         {
             return networkDeviceName.Split(':')[0];
@@ -418,9 +425,7 @@ namespace UOS
 
         private void PrepareChannels()
         {
-            IPAddress myIP = System.Array.Find<IPAddress>(
-                Dns.GetHostEntry(Dns.GetHostName()).AddressList,
-                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+            IPAddress myIP = GetLocalIP();
 
             channelManagers = new Dictionary<string, ChannelManager>();
             channelManagers["Ethernet:UDP"] = new UDPChannelManager(myIP, settings.eth.udp.port, settings.eth.udp.passivePortRange);
@@ -575,7 +580,7 @@ namespace UOS
                                 remoteDevice = UpDevice.FromJSON(responseDevice);
 
                             RegisterDevice(remoteDevice);
-                            logger.LogError("Successfully handshaked with device '" + device.networkDeviceName + "'.");
+                            logger.Log("Successfully handshaked with device '" + device.networkDeviceName + "'.");
                         }
                         else
                             logger.LogError("Not possible complete handshake with device '" + device.networkDeviceName + "' for no device on the handshake response.");

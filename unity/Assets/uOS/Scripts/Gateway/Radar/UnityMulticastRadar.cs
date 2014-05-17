@@ -23,11 +23,8 @@ namespace UOS
         public int port = 14984;
 
         private UdpClient udpClient = null;
+        private IPEndPoint localEndPoint;
 
-        private bool waiting;
-        private System.DateTime receiveStart;
-        private System.IAsyncResult receiveAsyncResult = null;
-        private object _receive_lock = new object();
         private System.DateTime lastCheck;
         private HashSet<string> lastAddresses;
         private HashSet<string> knownAddresses = new HashSet<string>();
@@ -46,12 +43,39 @@ namespace UOS
 
                 udpClient = new UdpClient();
                 udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                udpClient.ExclusiveAddressUse = false;
                 udpClient.EnableBroadcast = true;
-
                 udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
+                udpClient.Client.ReceiveTimeout = 10 * 1000; // ten seconds
 
-                SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
+                localEndPoint = new IPEndPoint(UnityGateway.GetLocalIP(), port);
+
+                SendBeacon();
+
+                var t = new Thread(new ThreadStart(
+                    delegate()
+                    {
+                        while (udpClient != null)
+                        {
+                            try
+                            {
+                                IPEndPoint endPoint = null;
+                                byte[] msg = udpClient.Receive(ref endPoint);
+                                if (!localEndPoint.Equals(endPoint))
+                                    PushEvent(new ReceiveEvent() { data = msg, remoteEndPoint = endPoint });
+                            }
+                            catch (SocketException)
+                            {
+                                // timout is expected!
+                                SendBeacon();
+                            }
+                            catch (System.Exception e)
+                            {
+                                PushEvent(e);
+                            }
+                        }
+                    }
+                ));
+                t.Start();
             }
         }
 
@@ -72,22 +96,14 @@ namespace UOS
 
             if (udpClient != null)
             {
-                if (waiting)
+                System.DateTime now = System.DateTime.Now;
+                if (now.Subtract(lastCheck).Seconds > 30)
                 {
-                    lock (_receive_lock)
-                    {
-                        if ((receiveAsyncResult != null) && (System.DateTime.Now.Subtract(receiveStart).Seconds > 10))
-                        {
-                            IPEndPoint ep = null;
-                            udpClient.EndReceive(receiveAsyncResult, ref ep);
-                            receiveAsyncResult = null;
-                            logger.Log("Receive timout!");
-                            ReceiveAnswers();
-                        }
-                    }
+                    SendBeacon();
+                    CheckLeftDevices();
+
+                    lastCheck = now;
                 }
-                else
-                    ReceiveAnswers();
             }
         }
 
@@ -97,19 +113,14 @@ namespace UOS
             {
                 ReceiveEvent e = (ReceiveEvent)evt;
                 HandleBeacon(e.data, e.remoteEndPoint);
-
-                SendBeacon(new IPEndPoint(IPAddress.Broadcast, port));
-                CheckLeftDevices();
             }
             else if (evt is System.Exception)
-            {
                 throw (System.Exception)evt;
-            }
         }
 
-        private void SendBeacon(IPEndPoint endPoint)
+        private void SendBeacon()
         {
-            waiting = true;
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Broadcast, port);
             udpClient.BeginSend(new byte[] { 1 }, 1, endPoint, new System.AsyncCallback(OnSendDone), udpClient);
         }
 
@@ -117,40 +128,6 @@ namespace UOS
         {
             UdpClient client = (UdpClient)ar.AsyncState;
             client.EndSend(ar);
-            waiting = false;
-        }
-
-        private void ReceiveAnswers()
-        {
-            waiting = true;
-            receiveStart = System.DateTime.Now;
-            var t = new Thread(new ThreadStart(BeginReceive));
-            t.Start();
-        }
-
-        private void BeginReceive()
-        {
-            try
-            {
-                lock (_receive_lock)
-                {
-                    receiveAsyncResult = udpClient.BeginReceive(new System.AsyncCallback(OnReceiveDone), udpClient);
-                }
-            }
-            catch (System.Exception e) { PushEvent(e); }
-        }
-
-        private void OnReceiveDone(System.IAsyncResult ar)
-        {
-            ReceiveEvent e = new ReceiveEvent();
-            UdpClient client = (UdpClient)ar.AsyncState;
-            e.data = client.EndReceive(ar, ref e.remoteEndPoint);
-            PushEvent(e);
-            waiting = false;
-            lock (_receive_lock)
-            {
-                receiveAsyncResult = null;
-            }
         }
 
         private void HandleBeacon(byte[] message, IPEndPoint endPoint)
@@ -168,21 +145,15 @@ namespace UOS
 
         private void CheckLeftDevices()
         {
-            System.DateTime now = System.DateTime.Now;
-
-            if (now.Subtract(lastCheck).Seconds > 30)
+            lastAddresses.RemoveWhere(a => knownAddresses.Contains(a));
+            foreach (var address in lastAddresses)
             {
-                lastAddresses.RemoveWhere(a => knownAddresses.Contains(a));
-                foreach (var address in lastAddresses)
-                {
-                    SocketDevice left = new SocketDevice(address, port, EthernetConnectionType.TCP);
-                    RaiseDeviceLeft(left);
-                }
-
-                lastAddresses = knownAddresses;
-                knownAddresses = new HashSet<string>();
-                lastCheck = now;
+                SocketDevice left = new SocketDevice(address, port, EthernetConnectionType.TCP);
+                RaiseDeviceLeft(left);
             }
+
+            lastAddresses = knownAddresses;
+            knownAddresses = new HashSet<string>();
         }
     }
 }
