@@ -41,11 +41,8 @@ namespace UOS
 
         private uOSSettings settings;
         private IDictionary<string, ChannelManager> channelManagers = null;
-        private UpDevice currentDevice = null;
-        private DeviceRegistry deviceRegistry = new DeviceRegistry();
-        private object _device_reg_lock = new object();
         private GatewayServer server = null;
-        private IDictionary<string, IList<ListenerInfo>> listenerMap = new Dictionary<string, IList<ListenerInfo>>();
+        private IDictionary<string, List<ListenerInfo>> listenerMap = new Dictionary<string, List<ListenerInfo>>();
         private Queue<ServiceCallEvent> serviceCallQueue = new Queue<ServiceCallEvent>();
         private object _service_call_queue_lock = new object();
         private UnityNetworkRadar radar = null;
@@ -53,6 +50,7 @@ namespace UOS
 
         public Logger logger { get; private set; }
         public DriverManager driverManager { get; private set; }
+        public DeviceManager deviceManager { get; private set; }
 
 
         /// <summary>
@@ -65,8 +63,7 @@ namespace UOS
             this.logger = logger;
 
             PrepareChannels();
-            PrepareDevice();
-            PrepareDrivers();
+            PrepareDeviceAndDrivers();
             PrepareServer();
             PrepareRadar();
         }
@@ -130,19 +127,16 @@ namespace UOS
         /// <returns></returns>
         public UpDevice GetCurrentDevice()
         {
-            return currentDevice;
+            return deviceManager.currentDevice;
         }
 
         /// <summary>
         /// Lists all found devices so far.
         /// </summary>
         /// <returns></returns>
-        public IList<UpDevice> ListDevices()
+        public List<UpDevice> ListDevices()
         {
-            lock (_device_reg_lock)
-            {
-                return deviceRegistry.List();
-            }
+            return deviceManager.ListDevices();
         }
 
         public ChannelManager GetChannelManager(string networkDeviceType)
@@ -249,77 +243,9 @@ namespace UOS
                 RemoteServiceCall(device, serviceCall, streamData, messageContext, callback, state);
         }
 
-        public void DeviceEntered(NetworkDevice device)
-        {
-            if (device == null)
-                return;
-
-            // verify if device entered is the current device
-            string deviceHost = GetHost(device.networkDeviceName);
-            foreach (UpNetworkInterface ni in currentDevice.networks)
-            {
-                string otherHost = ni.networkAddress;
-                if ((deviceHost != null) && deviceHost.Equals(otherHost))
-                {
-                    logger.Log("Host of device entered is the same of current device:" + device.networkDeviceName);
-                    return;
-                }
-            }
-
-            // verify if already know this device.
-            UpDevice upDevice = RetrieveDevice(deviceHost, device.networkDeviceType);
-
-            if (upDevice == null)
-                BeginHandshake(device, upDevice);
-            //{
-            //upDevice = DoHandshake(device, upDevice);
-            //if (upDevice != null)
-            //    DoDriversRegistry(device, upDevice);
-            //}
-            else
-                logger.Log("Already known device " + device.networkDeviceName);
-        }
-
-        public void DeviceLeft(NetworkDevice device)
-        {
-        }
-
-        public void RegisterDevice(UpDevice device)
-        {
-            lock (_device_reg_lock)
-            {
-                deviceRegistry.Add(device);
-            }
-        }
-
-        public UpDevice RetrieveDevice(string deviceName)
-        {
-            lock (_device_reg_lock)
-            {
-                return deviceRegistry.Find(deviceName);
-            }
-        }
-
         public UpDevice RetrieveDevice(string networkAddress, string networkType)
         {
-            IList<UpDevice> list = null;
-            lock (_device_reg_lock)
-            {
-                list = deviceRegistry.List(networkAddress, networkType);
-            }
-
-            if (list != null && (list.Count > 0))
-            {
-                UpDevice deviceFound = list[0];
-                logger.Log(
-                    "Device with addr '" + networkAddress + "' found on network '" + networkType + "' resolved to " + deviceFound);
-
-                return deviceFound;
-            }
-
-            logger.Log("No device found with addr '" + networkAddress + "' on network '" + networkType + "'.");
-
-            return null;
+            return deviceManager.RetrieveDevice(networkAddress, networkType);
         }
 
         public void HandleNotify(Notify notify, UpDevice device)
@@ -335,7 +261,7 @@ namespace UOS
 
             //Notifying listeners from more specific to more general entries
             string eventIdentifier;
-            IList<ListenerInfo> listeners;
+            List<ListenerInfo> listeners;
 
             // First full entries (device, driver, event, intanceId)
             eventIdentifier = GetEventIdentifier(device, notify.driver, notify.instanceId, notify.eventKey);
@@ -353,7 +279,7 @@ namespace UOS
                 HandleNotify(notify, listeners, eventIdentifier);
         }
 
-        private void HandleNotify(Notify notify, IList<ListenerInfo> listeners, string eventIdentifier)
+        private void HandleNotify(Notify notify, List<ListenerInfo> listeners, string eventIdentifier)
         {
             if ((listeners == null) || (listeners.Count == 0))
             {
@@ -432,9 +358,9 @@ namespace UOS
             channelManagers["Ethernet:TCP"] = new TCPChannelManager(myIP, settings.eth.tcp.port, settings.eth.tcp.passivePortRange);
         }
 
-        private void PrepareDevice()
+        private void PrepareDeviceAndDrivers()
         {
-            currentDevice = new UpDevice();
+            UpDevice currentDevice = new UpDevice();
 
             if (settings.deviceName != null)
             {
@@ -450,7 +376,7 @@ namespace UOS
 
             currentDevice.AddProperty("platform", "unity: " + Application.platform.ToString().ToLower());
 
-            IList<UpNetworkInterface> networks = new List<UpNetworkInterface>();
+            List<UpNetworkInterface> networks = new List<UpNetworkInterface>();
             foreach (ChannelManager cm in channelManagers.Values)
             {
                 NetworkDevice nd = cm.GetAvailableNetworkDevice();
@@ -461,14 +387,11 @@ namespace UOS
             }
 
             currentDevice.networks = networks;
-        }
 
-        private void PrepareDrivers()
-        {
-            driverManager = new DriverManager(settings, this);
+            driverManager = new DriverManager(settings, this, currentDevice);
+            deviceManager = new DeviceManager(settings, this, currentDevice);
 
-            DeviceDriver dd = new DeviceDriver();
-            driverManager.DeployDriver(dd.GetDriver(), dd);
+            driverManager.InitDrivers();
         }
 
         private void PrepareServer()
@@ -511,89 +434,13 @@ namespace UOS
             switch (type)
             {
                 case RadarEvent.DEVICE_ENTERED:
-                    DeviceEntered(device);
+                    deviceManager.DeviceEntered(device);
                     break;
 
                 case RadarEvent.DEVICE_LEFT:
-                    DeviceLeft(device);
+                    deviceManager.DeviceLeft(device);
                     break;
             }
-        }
-
-        //private void DoDriversRegistry(NetworkDevice device, UpDevice upDevice)
-        //{
-        //    Response response = CallService(upDevice, new Call(DEVICE_DRIVER_NAME, "listDrivers"));
-        //    if ((response != null) && (response.responseData != null))
-        //    {
-        //        object temp = response.getResponseData("driverList");
-        //        if (temp != null)
-        //        {
-        //            IDictionary<string, object> driversListMap = null;
-        //            if (temp is IDictionary<string, object>)
-        //                driversListMap = temp as IDictionary<string, object>;
-        //            else
-        //                driversListMap = Json.Deserialize(temp.ToString()) as IDictionary<string, object>;
-
-        //            string[] ids = new string[driversListMap.Count];
-        //            driversListMap.Keys.CopyTo(ids, 0);
-
-        //            RegisterRemoteDriverInstances(upDevice, driversListMap, ids);
-        //        }
-        //    }
-        //}
-
-        //private void RegisterRemoteDriverInstances(UpDevice upDevice, IDictionary<string, object> driversListMap, string[] instanceIds)
-        //{
-        //    foreach (string id in instanceIds)
-        //    {
-        //        UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(driversListMap[id] as string));
-        //        driverRegistry.Add(id, upDriver, upDevice.name);
-        //    }
-        //}
-
-        private void BeginHandshake(NetworkDevice device, UpDevice upDevice)
-        {
-            // Create a Dummy device just for calling it
-            logger.Log("Trying to hanshake with device : " + device.networkDeviceName);
-
-            UpDevice dummyDevice = new UpDevice(device.networkDeviceName);
-            dummyDevice.AddNetworkInterface(device.networkDeviceName, device.networkDeviceType);
-
-            Call call = new Call(DEVICE_DRIVER_NAME, "handshake", null);
-            call.AddParameter("device", Json.Serialize(currentDevice.ToJSON()));
-
-            CallService(
-                dummyDevice,
-                call,
-                delegate(uOSServiceCallInfo info, Response response, System.Exception e)
-                {
-                    if ((e == null) && (response != null) && ((response.error == null) || (response.error.Length == 0)))
-                    {
-                        // in case of a success greeting process, register the device in the neighborhood database
-                        object responseDevice = response.GetResponseData("device");
-                        if (responseDevice != null)
-                        {
-                            UpDevice remoteDevice;
-                            if (responseDevice is string)
-                                remoteDevice = UpDevice.FromJSON(Json.Deserialize(responseDevice as string));
-                            else
-                                remoteDevice = UpDevice.FromJSON(responseDevice);
-
-                            RegisterDevice(remoteDevice);
-                            logger.Log("Successfully handshaked with device '" + device.networkDeviceName + "'.");
-                        }
-                        else
-                            logger.LogError("Not possible complete handshake with device '" + device.networkDeviceName + "' for no device on the handshake response.");
-                    }
-                    else
-                        logger.LogError(
-                            "Not possible to handshake with device '" +
-                            device.networkDeviceName +
-                            ((e != null) ? (": " + e.Message) :
-                                ((response == null) ? ": No Response received." : (": " + response.error)))
-                        );
-                }
-            );
         }
 
         private bool IsLocalCall(UpDevice device)
@@ -601,7 +448,7 @@ namespace UOS
             return
                 (device == null) ||
                 (device.name == null) ||
-                (device.name.Equals(currentDevice.name, System.StringComparison.InvariantCultureIgnoreCase));
+                (device.name.Equals(GetCurrentDevice().name, System.StringComparison.InvariantCultureIgnoreCase));
         }
 
         private void RemoteServiceCall(
@@ -694,7 +541,7 @@ namespace UOS
                 {
                     string addr = GetHost(netDevice.networkDeviceName);
                     string type = netDevice.networkDeviceType;
-                    messageContext.callerDevice = RetrieveDevice(addr, type);
+                    messageContext.callerDevice = deviceManager.RetrieveDevice(addr, type);
                 }
 
                 //HandleDriverServiceCall(serviceCall, messageContext);
@@ -755,10 +602,10 @@ namespace UOS
         private UpNetworkInterface GetAppropriateInterface(UpDevice deviceProvider)
         {
             //List of compatible network interfaces
-            IList<UpNetworkInterface> compatibleNetworks = new List<UpNetworkInterface>();
+            List<UpNetworkInterface> compatibleNetworks = new List<UpNetworkInterface>();
 
             //Solves the different network link problem:
-            foreach (UpNetworkInterface thisNetInterface in currentDevice.networks)
+            foreach (UpNetworkInterface thisNetInterface in GetCurrentDevice().networks)
             {
                 foreach (UpNetworkInterface providerNetInterface in deviceProvider.networks)
                 {

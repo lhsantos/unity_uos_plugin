@@ -7,7 +7,7 @@ namespace UOS
     public class DeviceDriver : UOSDriver
     {
         private const string DEVICE_KEY = "device";
-        private const string SECURITY_TYPE_KEY = "securityType";
+        //private const string SECURITY_TYPE_KEY = "securityType";
         private const string DRIVER_LIST_KEY = "driverList";
         private const string DRIVER_NAME_KEY = "driverName";
         private const string INTERFACES_KEY = "interfaces";
@@ -34,8 +34,8 @@ namespace UOS
             driver.AddService("handshake")
                 .AddParameter(DEVICE_KEY, UpService.ParameterType.MANDATORY);
 
-            //driver.AddService("tellEquivalentDriver")
-            //    .AddParameter(DRIVER_NAME_KEY, UpService.ParameterType.MANDATORY);
+            driver.AddService("tellEquivalentDriver")
+                .AddParameter(DRIVER_NAME_KEY, UpService.ParameterType.MANDATORY);
         }
 
         public UpDriver GetDriver()
@@ -43,7 +43,7 @@ namespace UOS
             return driver;
         }
 
-        public IList<UpDriver> GetParent()
+        public List<UpDriver> GetParent()
         {
             return null;
         }
@@ -105,7 +105,8 @@ namespace UOS
             try
             {
                 UpDevice device = UpDevice.FromJSON(Json.Deserialize(deviceParameter));
-                gateway.RegisterDevice(device);
+
+                gateway.deviceManager.RegisterDevice(device);
 
                 serviceResponse.AddParameter(DEVICE_KEY, Json.Serialize(gateway.GetCurrentDevice().ToJSON()));
 
@@ -149,7 +150,58 @@ namespace UOS
 
         public void Goodbye(Call serviceCall, Response serviceResponse, CallContext messageContext)
         {
-            gateway.DeviceLeft(messageContext.callerNetworkDevice);
+            gateway.deviceManager.DeviceLeft(messageContext.callerNetworkDevice);
+        }
+
+        /// <summary>
+        /// This method is responsible for informing the unknown equivalent driverss.
+        /// </summary>
+        /// <param name="serviceCall"></param>
+        /// <param name="serviceResponse"></param>
+        /// <param name="messageContext"></param>
+        public void TellEquivalentDrivers(Call serviceCall, Response serviceResponse, CallContext messageContext)
+        {
+            try
+            {
+                string equivalentDrivers = serviceCall.GetParameterString(DRIVERS_NAME_KEY);
+                IList<object> equivalentDriversJson = Json.Deserialize(equivalentDrivers) as IList<object>;
+                List<object> jsonList = new List<object>();
+                IDictionary<string, object> responseData = new Dictionary<string, object>();
+
+                for (int i = 0; i < equivalentDriversJson.Count; i++)
+                {
+                    string equivalentDriver = equivalentDriversJson[i] as string;
+                    UpDriver driver = gateway.driverManager.GetDriverFromEquivalanceTree(equivalentDriver);
+
+                    if (driver != null)
+                        AddToEquivalanceList(jsonList, driver);
+                }
+
+                responseData[INTERFACES_KEY] = Json.Serialize(jsonList);
+                serviceResponse.responseData = responseData;
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError("Problems on equivalent drivers. " + e.StackTrace);
+            }
+        }
+
+        private void AddToEquivalanceList(IList<object> jsonList, UpDriver upDriver)
+        {
+
+            IList<string> equivalentDrivers = upDriver.equivalentDrivers;
+
+            if (equivalentDrivers != null)
+            {
+                foreach (string equivalentDriver in equivalentDrivers)
+                {
+                    UpDriver driver = gateway.driverManager.GetDriverFromEquivalanceTree(equivalentDriver);
+                    if (driver != null)
+                        AddToEquivalanceList(jsonList, driver);
+                }
+            }
+
+            jsonList.Add(upDriver.ToJSON());
         }
     }
 }

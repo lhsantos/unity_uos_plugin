@@ -24,7 +24,7 @@ namespace UOS
 
         private UnityGateway gateway;
         private bool running;
-        private IList<ServerThreadData> threads;
+        private List<ServerThreadData> threads;
 
 
 

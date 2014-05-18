@@ -7,7 +7,7 @@ namespace UOS
     public class TCPChannelManager : ChannelManager
     {
         private int defaultPort;
-        private IList<NetworkDevice> passiveDevices = new List<NetworkDevice>();
+        private List<NetworkDevice> passiveDevices = new List<NetworkDevice>();
         private int passiveIndex = 0;
         private IDictionary<string, TCPServerConnection> startedServers = new Dictionary<string, TCPServerConnection>();
 
@@ -81,7 +81,7 @@ namespace UOS
             return server.Accept();
         }
 
-        public IList<NetworkDevice> ListNetworkDevices()
+        public List<NetworkDevice> ListNetworkDevices()
         {
             return new List<NetworkDevice>(passiveDevices);
         }

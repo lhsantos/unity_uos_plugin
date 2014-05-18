@@ -23,4 +23,5 @@ MonoBehaviour:
   bth:
     provider: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     client: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-  deviceName: DublinDevice
+  deviceName: unity
+  radarType: 0

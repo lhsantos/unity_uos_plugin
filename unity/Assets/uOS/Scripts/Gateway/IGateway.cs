@@ -103,6 +103,6 @@ namespace UOS
 
         //List<DriverData> listDrivers(string driverName);
 
-        IList<UpDevice> ListDevices();
+        List<UpDevice> ListDevices();
     }
 }

@@ -7,7 +7,7 @@ namespace UOS
     {
         UpDriver GetDriver();
 
-        IList<UpDriver> GetParent();
+        List<UpDriver> GetParent();
 
         void Init(IGateway gateway, uOSSettings settings, string instanceId);
 

@@ -7,7 +7,7 @@ namespace UOS
     public class UpDevice
     {
         public string name { get; set; }
-        public IList<UpNetworkInterface> networks { get; set; }
+        public List<UpNetworkInterface> networks { get; set; }
         public IDictionary<string, string> meta { get; private set; }
 
 
@@ -77,7 +77,7 @@ namespace UOS
 
             if (networks != null)
             {
-                IList<object> j_networks = new List<object>();
+                List<object> j_networks = new List<object>();
                 foreach (var ni in networks)
                     j_networks.Add(ni.ToJSON());
                 Util.JsonPut(json, "networks", j_networks);
@@ -115,13 +115,13 @@ namespace UOS
             return null;
         }
 
-        private static IList<UpNetworkInterface> FromNetworks(IDictionary<string, object> json)
+        private static List<UpNetworkInterface> FromNetworks(IDictionary<string, object> json)
         {
             object obj = Util.JsonOptField(json, "networks");
             if (obj != null)
             {
-                IList<object> j_networks = obj as IList<object>;
-                IList<UpNetworkInterface> networks = new List<UpNetworkInterface>();
+                List<object> j_networks = obj as List<object>;
+                List<UpNetworkInterface> networks = new List<UpNetworkInterface>();
                 foreach (var j_network in j_networks)
                     networks.Add(UpNetworkInterface.FromJSON(j_network));
 

@@ -7,9 +7,9 @@ namespace UOS
     public class UpDriver
     {
         public string name { get; set; }
-        public IList<UpService> services { get; set; }
-        public IList<UpService> events { get; set; }
-        public IList<string> equivalentDrivers { get; set; }
+        public List<UpService> services { get; set; }
+        public List<UpService> events { get; set; }
+        public List<string> equivalentDrivers { get; set; }
 
         public UpDriver() { }
 
@@ -52,7 +52,7 @@ namespace UOS
             return AddService(new UpService(serviceName));
         }
 
-        public IList<string> AddEquivalentDrivers(string driver)
+        public List<string> AddEquivalentDrivers(string driver)
         {
             if (equivalentDrivers == null)
                 equivalentDrivers = new List<string>();
@@ -96,20 +96,20 @@ namespace UOS
             return json;
         }
 
-        private void AddStrings(IDictionary<string, object> json, string propName, IList<string> stringList)
+        private void AddStrings(IDictionary<string, object> json, string propName, List<string> stringList)
         {
             if (stringList != null)
             {
-                IList<string> json_array = new List<string>(stringList);
+                List<string> json_array = new List<string>(stringList);
                 json[propName] = json_array;
             }
         }
 
-        private void AddServices(IDictionary<string, object> json, string propName, IList<UpService> serviceList)
+        private void AddServices(IDictionary<string, object> json, string propName, List<UpService> serviceList)
         {
             if (serviceList != null)
             {
-                IList<object> json_array = new List<object>();
+                List<object> json_array = new List<object>();
                 foreach (UpService s in serviceList)
                     json_array.Add(s.ToJSON());
                 json[propName] = json_array;
@@ -128,12 +128,12 @@ namespace UOS
             return d;
         }
 
-        private static IList<string> StringsFromJSON(IDictionary<string, object> json, string propName)
+        private static List<string> StringsFromJSON(IDictionary<string, object> json, string propName)
         {
-            IList<object> array = Util.JsonOptField(json, propName) as IList<object>;
+            List<object> array = Util.JsonOptField(json, propName) as List<object>;
             if (array != null)
             {
-                IList<string> strings = new List<string>();
+                List<string> strings = new List<string>();
                 foreach (var o in array)
                     strings.Add(o as string);
 
@@ -143,12 +143,12 @@ namespace UOS
             return null;
         }
 
-        private static IList<UpService> ServicesFromJSON(IDictionary<string, object> json, string propName)
+        private static List<UpService> ServicesFromJSON(IDictionary<string, object> json, string propName)
         {
-            IList<object> jsonArray = Util.JsonOptField(json, propName) as IList<object>;
+            List<object> jsonArray = Util.JsonOptField(json, propName) as List<object>;
             if (jsonArray != null)
             {
-                IList<UpService> services = new List<UpService>();
+                List<UpService> services = new List<UpService>();
                 foreach (var o in jsonArray)
                     services.Add(UpService.FromJSON(o));
 

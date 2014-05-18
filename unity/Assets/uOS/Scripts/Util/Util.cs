@@ -130,10 +130,10 @@ namespace UOS
                 builder.Append(ident);
                 builder.Append("}");
             }
-            else if (json is IList<object>)
+            else if (json is List<object>)
             {
                 builder.Append("[\n");
-                IList<object> list = json as IList<object>;
+                List<object> list = json as List<object>;
                 for (int i = 0; i < list.Count; ++i)
                 {
                     builder.Append(JsonStructure(list[i], ident + "  "));

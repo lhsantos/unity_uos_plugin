@@ -13,7 +13,7 @@ namespace UOS
         }
 
         public string name { get; set; }
-        public IDictionary<string, ParameterType> parameters { get; set; }
+        public IDictionary<string, ParameterType?> parameters { get; set; }
 
 
         public UpService() { }
@@ -26,7 +26,7 @@ namespace UOS
         public UpService AddParameter(string paramName, ParameterType paramType)
         {
             if (parameters == null)
-                parameters = new Dictionary<string, ParameterType>();
+                parameters = new Dictionary<string, ParameterType?>();
 
             parameters[paramName] = paramType;
 

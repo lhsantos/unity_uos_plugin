@@ -7,7 +7,7 @@ namespace UOS
     public class UDPChannelManager : ChannelManager
     {
         private int defaultPort;
-        private IList<NetworkDevice> passiveDevices = new List<NetworkDevice>();
+        private List<NetworkDevice> passiveDevices = new List<NetworkDevice>();
         private int passiveIndex = 0;
         private IDictionary<string, UDPServerConnection> startedServers = new Dictionary<string, UDPServerConnection>();
 
@@ -76,7 +76,7 @@ namespace UOS
             return server.Accept();
         }
 
-        public IList<NetworkDevice> ListNetworkDevices()
+        public List<NetworkDevice> ListNetworkDevices()
         {
             return new List<NetworkDevice>(passiveDevices);
         }

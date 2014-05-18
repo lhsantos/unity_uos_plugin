@@ -3,19 +3,19 @@
 
 namespace UOS
 {
-    public class DeviceRegistry
+    public class DeviceDAO
     {
         private IDictionary<string, UpDevice> deviceMap;
         private IDictionary<string, UpDevice> interfaceMap;
-        private IDictionary<string, IList<UpDevice>> networkTypeMap;
-        private IDictionary<string, IList<UpDevice>> addressMap;
+        private IDictionary<string, List<UpDevice>> networkTypeMap;
+        private IDictionary<string, List<UpDevice>> addressMap;
 
-        public DeviceRegistry()
+        public DeviceDAO()
         {
             deviceMap = new Dictionary<string, UpDevice>();
             interfaceMap = new Dictionary<string, UpDevice>();
-            networkTypeMap = new Dictionary<string, IList<UpDevice>>();
-            addressMap = new Dictionary<string, IList<UpDevice>>();
+            networkTypeMap = new Dictionary<string, List<UpDevice>>();
+            addressMap = new Dictionary<string, List<UpDevice>>();
         }
 
         public void Add(UpDevice device)
@@ -26,7 +26,7 @@ namespace UOS
                 {
                     interfaceMap[GenerateInterfaceKey(ni)] = device;
 
-                    IList<UpDevice> devices = null;
+                    List<UpDevice> devices = null;
                     if (!networkTypeMap.TryGetValue(ni.netType, out devices))
                     {
                         devices = new List<UpDevice>();
@@ -67,12 +67,12 @@ namespace UOS
             deviceMap.Remove(name.ToLower());
         }
 
-        public IList<UpDevice> List()
+        public List<UpDevice> List()
         {
             return new List<UpDevice>(deviceMap.Values);
         }
 
-        public IList<UpDevice> List(string address, string networktype)
+        public List<UpDevice> List(string address, string networktype)
         {
             if ((address != null) && (networktype != null))
             {
@@ -87,13 +87,13 @@ namespace UOS
             }
             else if (address != null)
             {
-                IList<UpDevice> devices = null;
+                List<UpDevice> devices = null;
                 if (addressMap.TryGetValue(address, out devices))
                     return new List<UpDevice>(new HashSet<UpDevice>(devices));
             }
             else if (networktype != null)
             {
-                IList<UpDevice> devices = null;
+                List<UpDevice> devices = null;
                 if (networkTypeMap.TryGetValue(networktype, out devices))
                     return new List<UpDevice>(new HashSet<UpDevice>(devices));
             }

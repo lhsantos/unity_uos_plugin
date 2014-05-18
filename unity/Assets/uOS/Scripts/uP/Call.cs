@@ -9,7 +9,7 @@ namespace UOS
     {
         private object _lock = new object();
 
-        private IList<ClientConnection> connections;
+        private List<ClientConnection> connections;
 
         public NetworkDevice callerNetworkDevice { get; set; }
         public UpDevice callerDevice { get; set; }
@@ -166,7 +166,7 @@ namespace UOS
             call.serviceType = Util.JsonOptEnum<ServiceType>(json, "serviceType", call.serviceType);
             call.channels = Util.JsonOptInt(json, "channels", call.channels);
 
-            IList<string> ids = Util.JsonOptField(json, "channelIDs") as IList<string>;
+            List<string> ids = Util.JsonOptField(json, "channelIDs") as List<string>;
             if (ids != null)
             {
                 call.channelIDs = new string[ids.Count];
