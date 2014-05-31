@@ -32,9 +32,9 @@ namespace UOS
         public UnityMulticastRadar(Logger logger)
             : base(logger) { }
 
-        public override void StartRadar()
+        public override void Init()
         {
-            base.StartRadar();
+            base.Init();
 
             if (udpClient == null)
             {
@@ -79,10 +79,11 @@ namespace UOS
             }
         }
 
-        public override void StopRadar()
+        public override void TearDown()
         {
-            base.StopRadar();
+            base.TearDown();
 
+            udpClient.Close();
             udpClient = null;
         }
 

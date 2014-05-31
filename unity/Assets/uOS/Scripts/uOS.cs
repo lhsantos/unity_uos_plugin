@@ -8,7 +8,21 @@ using UOS;
 /// </summary>
 public sealed class uOS : MonoBehaviour
 {
+    private static Logger _logger;
     private static uOS _instance;
+
+    private static Logger logger
+    {
+        get
+        {
+            if (_logger == null)
+                _logger = new UnityLogger();
+            return _logger;
+        }
+
+        set { _logger = value; }
+    }
+
     private static uOS instance
     {
         get
@@ -70,26 +84,29 @@ public sealed class uOS : MonoBehaviour
         }
     }
 
-    public static void Init(Logger logger = null)
+    public static void Init(Logger plogger = null)
     {
+        if (plogger != null)
+            logger = plogger;
+
         if (!ready)
         {
-            Debug.Log("uOS init");
+            logger.Log("uOS init");
 
-            _instance._gateway = new UnityGateway(settings, logger != null ? logger : new UnityLogger());
+            _instance._gateway = new UnityGateway(settings, logger);
             _instance._gateway.Init();
 
             _instance._ready = true;
         }
         else
-            Debug.LogWarning("uOS already initiated!");
+            logger.LogWarning("uOS already initiated!");
     }
 
     public static void TearDown()
     {
         if (ready)
         {
-            Debug.Log("uOS tear down");
+            logger.Log("uOS tear down");
 
             _instance._gateway.TearDown();
             _instance._gateway = null;
@@ -97,7 +114,7 @@ public sealed class uOS : MonoBehaviour
             _instance._ready = false;
         }
         else
-            Debug.LogWarning("uOS already dead!");
+            logger.LogWarning("uOS already dead!");
     }
 
     void Update()

@@ -50,6 +50,9 @@ namespace UOS
 
         public void TearDown()
         {
+            foreach (var t in threads)
+                t.thread.Abort();
+
             threads.Clear();
             running = false;
         }
@@ -170,6 +173,7 @@ namespace UOS
         {
             public GatewayServer gatewayServer { get; private set; }
             public NetworkDevice device { get; private set; }
+            public Thread thread { get; private set; }
 
 
             public ServerThreadData(GatewayServer gatewayServer, NetworkDevice device)
@@ -177,7 +181,8 @@ namespace UOS
                 this.gatewayServer = gatewayServer;
                 this.device = device;
 
-                (new Thread(new ThreadStart(ConnectionThread))).Start();
+                thread = new Thread(new ThreadStart(ConnectionThread));
+                thread.Start();
             }
 
             private void PushMessage(ClientConnection con, string message)
@@ -244,11 +249,14 @@ namespace UOS
                             }
                         }
                     }
+                    catch (System.Threading.ThreadAbortException)
+                    {
+                        if (con != null) con.Close();
+                        return;
+                    }
                     catch (System.Exception e)
                     {
-                        if (con != null)
-                            con.Close();
-
+                        if (con != null) con.Close();
                         gatewayServer.PushEvent(new LogEvent("Failed to handle ubiquitos-smartspace connection. ", e));
                     }
                 }

@@ -281,38 +281,37 @@ namespace UOS
 
         private void ValidateInterfaces(List<UpService> parentServices, List<UpService> driverServices)
         {
-            if (parentServices == driverServices && driverServices == null)
+            if ((parentServices == null) && (driverServices == null))
                 return;
 
-            if ((parentServices == null && driverServices != null) || (parentServices != null && driverServices == null))
+            if ((parentServices != null && driverServices != null) || (parentServices != null && driverServices == null))
                 throw new InterfaceValidationException("The deployed DriverInstance must have the same parameters.");
 
             foreach (UpService parentService in parentServices)
             {
                 var driverService = driverServices.Find(s => s.Equals(parentService));
-                if (driverServices != null)
+                if (driverService == null)
+                    throw new InterfaceValidationException("The deployed DriverInstance must have the same service name than its parent.");
+
+                var parameters = parentService.parameters;
+                if (parameters != null)
                 {
-                    var parameters = parentService.parameters;
-                    if (parameters != null)
+                    var driverParameters = driverService.parameters;
+                    if ((driverParameters != null) && (parameters.Count == driverParameters.Count))
                     {
-                        foreach (string parameterName in parameters.Keys)
+                        foreach (var parameter in parameters)
                         {
-                            var driverParameters = driverService.parameters;
-                            if ((driverParameters != null) && (parameters.Count == driverParameters.Count))
-                            {
-                                var driverParameter = driverParameters[parameterName];
-                                if (driverParameter == null || !parentService.parameters[parameterName].Equals(driverParameter))
-                                    throw new InterfaceValidationException("The deployed DriverInstance must have the same parameters.");
-                            }
-                            else
-                                throw new InterfaceValidationException("The deployed DriverInstance must have the same parameters.");
+                            UpService.ParameterType? driverParameter = null;
+                            if (!(driverParameters.TryGetValue(parameter.Key, out driverParameter)
+                                  && parameter.Value.Equals(driverParameter)))
+                                throw new InterfaceValidationException("The deployed DriverInstance must have the same parameter names and types.");
                         }
                     }
-                    else if (driverService.parameters != null)
-                        throw new InterfaceValidationException("The deployed DriverInstance must have the same parameters.");
+                    else
+                        throw new InterfaceValidationException("The deployed DriverInstance must have the same parameter quantities.");
                 }
-                else
-                    throw new InterfaceValidationException("The deployed DriverInstance must have the same service name than its parent.");
+                else if (driverService.parameters != null)
+                    throw new InterfaceValidationException("The deployed DriverInstance must have the same parameter quantities.");
             }
         }
 
@@ -385,8 +384,10 @@ namespace UOS
 
         public UpDriver GetDriverFromEquivalanceTree(string driverName)
         {
-            TreeNode driver = driverHash[driverName];
-            return (driver == null) ? null : driver.driver;
+            TreeNode driver = null;
+            if (!driverHash.TryGetValue(driverName, out driver))
+                return null;
+            return driver.driver;
         }
 
         /// <summary>
@@ -401,8 +402,8 @@ namespace UOS
             lock (_driverdao_lock) { list = driverDao.List(driverName, deviceName); }
             HashSet<DriverModel> baseSet = new HashSet<DriverModel>(list);
 
-            TreeNode driverNode = driverHash[driverName];
-            if (driverNode != null)
+            TreeNode driverNode = null;
+            if ((driverName != null) && driverHash.TryGetValue(driverName, out driverNode))
             {
                 List<TreeNode> equivalentDrivers = driverNode.children;
                 baseSet.UnionWith(FindAllEquivalentDrivers(equivalentDrivers));

@@ -59,6 +59,7 @@ public class TestUOS : MonoBehaviour, Logger
 
     private void DoLog(string msg)
     {
+        Debug.Log(msg);
         myLog = msg + "\n" + myLog;
     }
 }

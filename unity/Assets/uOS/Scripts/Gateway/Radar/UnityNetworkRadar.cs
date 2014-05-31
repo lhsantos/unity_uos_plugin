@@ -56,7 +56,7 @@ namespace UOS
         /// <summary>
         /// Starts this radar.
         /// </summary>
-        public virtual void StartRadar()
+        public virtual void Init()
         {
             if (running)
                 logger.LogWarning("Radar on already running.");
@@ -67,7 +67,7 @@ namespace UOS
         /// <summary>
         /// Stops this radar.
         /// </summary>
-        public virtual void StopRadar()
+        public virtual void TearDown()
         {
             running = false;
         }

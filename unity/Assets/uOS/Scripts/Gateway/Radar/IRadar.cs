@@ -8,11 +8,11 @@
         /// <summary>
         /// Starts the radar.
         /// </summary>
-        void StartRadar();
+        void Init();
 
         /// <summary>
         /// Stops the radar.
         /// </summary>
-        void StopRadar();
+        void TearDown();
     }
 }

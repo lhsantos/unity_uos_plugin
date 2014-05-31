@@ -76,7 +76,7 @@ namespace UOS
             server.Init();
 
             if (radar != null)
-                radar.StartRadar();
+                radar.Init();
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace UOS
         {
             if (radar != null)
             {
-                radar.StopRadar();
+                radar.TearDown();
                 radar = null;
             }
 
