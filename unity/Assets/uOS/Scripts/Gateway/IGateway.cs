@@ -16,6 +16,13 @@ namespace UOS
     public interface IGateway
     {
         /// <summary>
+        /// Retrieves the uOS device this app is running on.
+        /// </summary>
+        /// <returns></returns>
+        UpDevice currentDevice { get; }
+
+
+        /// <summary>
         /// Initilises this Gateway.
         /// </summary>
         void Init();
@@ -46,13 +53,13 @@ namespace UOS
         );
 
         /// <summary>
-        /// Asynchrounous service call.
+        /// Asynchronous service call.
         /// </summary>
         /// <param name="device"></param>
         /// <param name="serviceCall"></param>
         /// <param name="callback"></param>
         /// <param name="state"></param>
-        void CallService(
+        void CallServiceAsync(
             UpDevice device,
             Call serviceCall,
             uOSServiceCallBack callback,
@@ -98,11 +105,26 @@ namespace UOS
         //    UpDevice device
         //);
 
+        /// <summary>
+        /// Lists all drivers found so far.
+        /// </summary>
+        /// <param name="driverName"></param>
+        /// <returns></returns>
+        List<DriverData> ListDrivers(string driverName);
 
-        UpDevice GetCurrentDevice();
-
-        //List<DriverData> listDrivers(string driverName);
-
+        /// <summary>
+        /// Lists all found devices so far.
+        /// </summary>
+        /// <returns></returns>
         List<UpDevice> ListDevices();
+    }
+
+    public class ServiceCallException : System.Exception
+    {
+        public ServiceCallException() { }
+
+        public ServiceCallException(string msg) : base(msg) { }
+
+        public ServiceCallException(System.Exception e) : base(null, e) { }
     }
 }

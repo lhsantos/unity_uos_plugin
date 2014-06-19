@@ -35,12 +35,22 @@ namespace UOS
             return tcpClient;
         }
 
-        public override int Read(byte[] buffer, int offset, int size)
+        public override byte[] Read()
         {
             NetworkStream stream = tcpClient.GetStream();
             if (stream.CanRead)
             {
-                return stream.Read(buffer, offset, size);
+                byte[] buffer = new byte[1024];
+                List<byte> data = new List<byte>();
+                do
+                {
+                    int read = stream.Read(buffer, 0, buffer.Length);
+                    data.Capacity = System.Math.Max(data.Count + read, data.Capacity);
+                    for (int i = 0; i < read; ++i)
+                        data.Add(buffer[i]);
+                } while (stream.DataAvailable);
+
+                return data.ToArray();
             }
             else
                 throw new System.Exception("Can't read from this stream right now!");
@@ -52,62 +62,6 @@ namespace UOS
             if (stream.CanWrite)
             {
                 stream.Write(buffer, offset, size);
-            }
-            else
-                throw new System.Exception("Can't write to this stream right now!");
-        }
-
-        public override void ReadAsync(ReadCallback callback, object callerState)
-        {
-            NetworkStream stream = tcpClient.GetStream();
-            if (stream.CanRead)
-            {
-                Thread t = new Thread(new ThreadStart(delegate()
-                {
-                    try
-                    {
-                        byte[] buffer = new byte[tcpClient.ReceiveBufferSize];
-                        int read = stream.Read(buffer, 0, buffer.Length);
-                        if (read > 0)
-                        {
-                            byte[] aux = new byte[read];
-                            System.Array.Copy(buffer, aux, read);
-                            buffer = aux;
-                        }
-                        else
-                            buffer = null;
-
-                        callback(buffer, callerState, null);
-                    }
-                    catch (System.Exception e)
-                    {
-                        callback(null, callerState, e.InnerException);
-                    }
-                }));
-                t.Start();
-            }
-            else
-                throw new System.Exception("Can't read from this stream right now!");
-        }
-
-        public override void WriteAsync(byte[] buffer, WriteCallback callback, object callerState)
-        {
-            NetworkStream stream = tcpClient.GetStream();
-            if (stream.CanWrite)
-            {
-                Thread t = new Thread(new ThreadStart(delegate()
-                {
-                    try
-                    {
-                        stream.Write(buffer, 0, buffer.Length);
-                        callback(buffer.Length, callerState, null);
-                    }
-                    catch (System.Exception e)
-                    {
-                        callback(0, callerState, e.InnerException);
-                    }
-                }));
-                t.Start();
             }
             else
                 throw new System.Exception("Can't write to this stream right now!");

@@ -1,5 +1,6 @@
 ﻿using MiniJSON;
 using System.Collections.Generic;
+using System.Threading;
 
 
 namespace UOS
@@ -111,102 +112,114 @@ namespace UOS
             UpDevice upDevice = RetrieveDevice(deviceHost, device.networkDeviceType);
 
             if (upDevice == null)
-                BeginHandshake(device);
+                // Does handshake on a new thread...
+                new Thread(new ThreadStart(delegate()
+                {
+                    upDevice = DoHandshake(device);
+                    if (upDevice != null)
+                        DoDriversRegistry(device, upDevice);
+                })).Start();
             else
                 logger.Log("Already known device " + device.networkDeviceName);
         }
 
-        private void BeginHandshake(NetworkDevice device)
+        private UpDevice DoHandshake(NetworkDevice device)
         {
-            // Create a Dummy device just for calling it
-            logger.Log("Trying to hanshake with device : " + device.networkDeviceName);
+            try
+            {
+                // Create a Dummy device just for calling it
+                logger.Log("Trying to handshake with device : " + device.networkDeviceName);
 
-            UpDevice dummyDevice = new UpDevice(device.networkDeviceName);
-            dummyDevice.AddNetworkInterface(device.networkDeviceName, device.networkDeviceType);
+                UpDevice dummyDevice = new UpDevice(device.networkDeviceName);
+                dummyDevice.AddNetworkInterface(device.networkDeviceName, device.networkDeviceType);
 
-            Call call = new Call(DEVICE_DRIVER_NAME, "handshake", null);
-            call.AddParameter("device", Json.Serialize(currentDevice.ToJSON()));
+                Call call = new Call(DEVICE_DRIVER_NAME, "handshake", null);
+                call.AddParameter("device", Json.Serialize(currentDevice.ToJSON()));
 
-            gateway.CallService(
-                dummyDevice,
-                call,
-                delegate(uOSServiceCallInfo info, Response response, System.Exception e)
+                Response response = gateway.CallService(dummyDevice, call);
+                if (response != null && ((response.error == null) || (response.error.Length == 0)))
                 {
-                    if ((e == null) && (response != null) && ((response.error == null) || (response.error.Length == 0)))
+                    // in case of a success greeting process, register the device in the neighborhood database
+                    object responseDevice = response.GetResponseData("device");
+                    if (responseDevice != null)
                     {
-                        // in case of a success greeting process, register the device in the neighborhood database
-                        object responseDevice = response.GetResponseData("device");
-                        if (responseDevice != null)
-                        {
-                            UpDevice upDevice;
-                            if (responseDevice is string)
-                                upDevice = UpDevice.FromJSON(Json.Deserialize(responseDevice as string));
-                            else
-                                upDevice = UpDevice.FromJSON(responseDevice);
-
-                            RegisterDevice(upDevice);
-                            BeginRegisterDrivers(device, upDevice);
-
-                            logger.Log("Successfully handshaked with device '" + device.networkDeviceName + "'.");
-                        }
+                        UpDevice remoteDevice;
+                        if (responseDevice is string)
+                            remoteDevice = UpDevice.FromJSON(Json.Deserialize(responseDevice as string));
                         else
-                            logger.LogError("Not possible complete handshake with device '" + device.networkDeviceName + "' for no device on the handshake response.");
+                            remoteDevice = UpDevice.FromJSON(responseDevice);
+
+                        RegisterDevice(remoteDevice);
+                        logger.Log("Registered device " + remoteDevice.name);
+
+                        return remoteDevice;
                     }
                     else
                         logger.LogError(
-                            "Not possible to handshake with device '" +
-                            device.networkDeviceName +
-                            ((e != null) ? (": " + e.Message) :
-                                ((response == null) ? ": No Response received." : (": " + response.error)))
-                        );
+                            "Not possible complete handshake with device '" + device.networkDeviceName +
+                            "' for no device on the handshake response.");
                 }
-            );
+                else
+                {
+                    logger.LogError(
+                        "Not possible to handshake with device '" +
+                        device.networkDeviceName +
+                        (response == null ? ": No Response received." : "': Cause : " + response.error));
+                }
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError("Not possible to handshake with device '" + device.networkDeviceName + "'. " + e.Message);
+            }
+
+            return null;
         }
 
-        private void BeginRegisterDrivers(NetworkDevice device, UpDevice upDevice)
+        private void DoDriversRegistry(NetworkDevice device, UpDevice upDevice)
         {
-            Call call = new Call(DEVICE_DRIVER_NAME, "listDrivers");
-            gateway.CallService(
-                upDevice,
-                call,
-                delegate(uOSServiceCallInfo info, Response response, System.Exception e)
+            try
+            {
+                Response response = gateway.CallService(upDevice, new Call(DEVICE_DRIVER_NAME, "listDrivers"));
+                if ((response != null) && (response.responseData != null) && (response.GetResponseData("driverList") != null))
                 {
                     try
                     {
-                        if (e != null)
-                            throw e;
-                        if ((response.error != null) && (response.error.Length > 0))
-                            throw new System.Exception(response.error);
-
+                        IDictionary<string, object> driversListMap = null;
                         object temp = response.GetResponseData("driverList");
-                        if (temp != null)
-                        {
-                            IDictionary<string, object> driversListMap = null;
-                            if (temp is IDictionary<string, object>)
-                                driversListMap = (IDictionary<string, object>)temp; //TODO: Not tested. Why?
-                            else
-                                driversListMap = (IDictionary<string, object>)Json.Deserialize(temp.ToString());
+                        if (temp is IDictionary<string, object>)
+                            driversListMap = temp as IDictionary<string, object>; //TODO: Not tested. Why?
+                        else
+                            driversListMap = Json.Deserialize(temp.ToString()) as IDictionary<string, object>;
 
-                            List<string> ids = new List<string>(driversListMap.Keys);
-                            RegisterRemoteDriverInstances(upDevice, driversListMap, ids.ToArray());
-                        }
+                        List<string> ids = new List<string>(driversListMap.Keys);
+                        RegisterRemoteDriverInstances(upDevice, driversListMap, ids.ToArray());
                     }
-                    catch (System.NullReferenceException) { /* null parameters, do nothing */ }
-                    catch (System.Exception)
+                    catch (System.Exception e)
                     {
+                        UnityEngine.Debug.Log(e);
+                        UnityEngine.Debug.Log(e.StackTrace);
                         logger.LogError(
-                            "Failed to list drivers for device " + upDevice.name +
-                            " on interface " + device.networkDeviceName);
+                            "Problems occurred while registering drivers from device '" + upDevice.name + "' . " + e.Message);
                     }
                 }
-            );
+            }
+            catch (System.Exception)
+            {
+                logger.LogError(
+                    "Not possible to discover services from device '" + device.networkDeviceName +
+                    "'. Possibly not a uOS Device");
+            }
         }
 
         private void RegisterRemoteDriverInstances(UpDevice upDevice, IDictionary<string, object> driversListMap, string[] instanceIds)
         {
             foreach (string id in instanceIds)
             {
-                UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(driversListMap[id].ToString()));
+                object instance = driversListMap[id];
+                if (instance is string)
+                    instance = Json.Deserialize(instance as string);
+
+                UpDriver upDriver = UpDriver.FromJSON(instance);
                 DriverModel driverModel = new DriverModel(id, upDriver, upDevice.name);
 
                 try
@@ -222,92 +235,88 @@ namespace UOS
                 catch (System.Exception)
                 {
                     logger.LogError(
-                        "Problems ocurred in the registering of driver '" + upDriver.name +
+                        "Problems occurred in the registering of driver '" + upDriver.name +
                         "' with instanceId '" + id + "' in the device '" + upDevice.name +
                         "' and it will not be registered.");
                 }
             }
 
             if (unknownDrivers.Count > 0)
-                BeginFindDrivers(unknownDrivers, upDevice);
+                FindDrivers(unknownDrivers, upDevice);
         }
 
-        private void BeginFindDrivers(HashSet<string> unknownDrivers, UpDevice upDevice)
+        private void FindDrivers(HashSet<string> unknownDrivers, UpDevice upDevice)
         {
             Call call = new Call(DEVICE_DRIVER_NAME, "tellEquivalentDrivers", null);
             call.AddParameter(DRIVERS_NAME_KEY, Json.Serialize(new List<string>(unknownDrivers)));
 
-            gateway.CallService(
-                upDevice,
-                call,
-                delegate(uOSServiceCallInfo info, Response response, System.Exception e)
+            try
+            {
+                Response equivalentDriverResponse = gateway.CallService(upDevice, call);
+
+                if ((equivalentDriverResponse != null) &&
+                    ((equivalentDriverResponse.error == null) || (equivalentDriverResponse.error.Length == 0)))
                 {
-                    try
+                    string interfaces = equivalentDriverResponse.GetResponseString(INTERFACES_KEY);
+
+                    if (interfaces != null)
                     {
-                        if (e != null)
-                            throw e;
-                        if ((response.error != null) && (response.error.Length > 0))
-                            throw new System.Exception(response.error);
+                        List<UpDriver> drivers = new List<UpDriver>();
+                        List<object> interfacesJson = Json.Deserialize(interfaces) as List<object>;
 
-
-                        string interfaces = response.GetResponseString(INTERFACES_KEY);
-                        if (interfaces != null)
+                        for (int i = 0; i < interfacesJson.Count; ++i)
                         {
-                            List<UpDriver> drivers = new List<UpDriver>();
-                            List<object> interfacesJson = Json.Deserialize(interfaces) as List<object>;
+                            UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(interfacesJson[i] as string));
+                            drivers.Add(upDriver);
+                        }
 
-                            for (int i = 0; i < interfacesJson.Count; i++)
-                            {
-                                UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(interfacesJson[i] as string));
-                                drivers.Add(upDriver);
-                            }
+                        try
+                        {
+                            driverManager.AddToEquivalenceTree(drivers);
+                        }
+                        catch (InterfaceValidationException)
+                        {
+                            logger.LogError("Not possible to add to equivalence tree due to wrong interface specification.");
+                        }
 
+                        foreach (DriverModel dependent in dependents)
+                        {
                             try
                             {
-                                driverManager.AddToEquivalenceTree(drivers);
+                                driverManager.Insert(dependent);
                             }
-                            catch (InterfaceValidationException)
+                            catch (DriverNotFoundException)
                             {
-                                logger.LogError("Not possible to add to equivalance tree due to wrong interface specification.");
+                                logger.LogError(
+                                    "Not possible to register driver '" +
+                                    dependent.driver.name + "' due to unknown equivalent driver.");
                             }
-
-                            foreach (DriverModel dependent in dependents)
+                            catch (System.Exception)
                             {
-                                try
-                                {
-                                    driverManager.Insert(dependent);
-                                }
-                                catch (DriverNotFoundException)
-                                {
-                                    logger.LogError(
-                                        "Not possible to register driver '" +
-                                        dependent.driver.name + "' due to unkwnown equivalent driver.");
-                                }
-                                catch (System.Exception)
-                                {
-                                    logger.LogError(
-                                        "Problems ocurred in the registering of driver '" +
-                                        dependent.driver.name + "' with instanceId '" + dependent.id +
-                                        "' in the device '" + upDevice.name + "' and it will not be registered.");
-                                }
+                                logger.LogError(
+                                    "Problems occurred in the registering of driver '" +
+                                    dependent.driver.name + "' with instanceId '" + dependent.id +
+                                    "' in the device '" + upDevice.name + "' and it will not be registered.");
                             }
                         }
-                        else
-                            logger.LogError(
-                                "Not possible to call service on device '" + upDevice.name +
-                                "' for no equivalent drivers on the service response.");
                     }
-                    catch (System.NullReferenceException) { /* null parameters, do nothing */ }
-                    catch (System.Exception ex)
-                    {
+                    else
                         logger.LogError(
-                            "Not possible to call service on device '" +
-                            upDevice.name + "': Cause : " + ex.Message);
-                    }
+                            "Not possible to call service on device '" + upDevice.name +
+                            "' for no equivalent drivers on the service response.");
                 }
-            );
+                else
+                {
+                    logger.LogError(
+                        "Not possible to call service on device '" + upDevice.name +
+                        (equivalentDriverResponse == null ? ": null" : "': Cause : " + equivalentDriverResponse.error));
+                }
+            }
+            catch (ServiceCallException)
+            {
+                logger.LogError("Not possible to call service on device '" + upDevice.name);
+            }
         }
-
 
         /// <summary>
         /// Called by radar whenever a device leaves the space.

@@ -71,7 +71,7 @@ namespace UOS
                 IList<DriverData> listDrivers =
                     driverManager.ListDrivers(
                         ((parameters != null) ? (parameters[DRIVER_NAME_KEY] as string) : null),
-                        gateway.GetCurrentDevice().name
+                        gateway.currentDevice.name
                     );
 
                 IDictionary<string, object> driversList = new Dictionary<string, object>();
@@ -108,7 +108,7 @@ namespace UOS
 
                 gateway.deviceManager.RegisterDevice(device);
 
-                serviceResponse.AddParameter(DEVICE_KEY, Json.Serialize(gateway.GetCurrentDevice().ToJSON()));
+                serviceResponse.AddParameter(DEVICE_KEY, Json.Serialize(gateway.currentDevice.ToJSON()));
 
                 //TODO: actually implement the driver register for other devices...
                 //gateway.CallService(

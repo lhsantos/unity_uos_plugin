@@ -8,20 +8,6 @@ namespace UOS
 {
     public class GatewayServer : UnityEventHandler
     {
-        private struct MessageEvent
-        {
-            public NetworkDevice device;
-            public ClientConnection connection;
-            public string message;
-
-            public MessageEvent(NetworkDevice device, ClientConnection connection, string message)
-            {
-                this.device = device;
-                this.connection = connection;
-                this.message = message;
-            }
-        }
-
         private UnityGateway gateway;
         private bool running;
         private List<ServerThreadData> threads;
@@ -59,19 +45,16 @@ namespace UOS
 
         protected override void HandleEvent(object o)
         {
-            HandleMessage((MessageEvent)o);
+            throw new System.InvalidOperationException("Unexpected event on GatewayServer!");
         }
 
-        private void HandleMessage(MessageEvent msgEvt)
+        private void HandleMessage(string message, NetworkDevice clientDevice, ClientConnection connection)
         {
-            if ((msgEvt.message == null) ||
-                (msgEvt.device == null) ||
-                (msgEvt.connection == null) ||
-                (!msgEvt.connection.connected))
+            if ((message == null) || ((message = message.Trim()).Length == 0) ||
+                (clientDevice == null) ||
+                (connection == null) || (!connection.connected))
                 return;
 
-            string message = msgEvt.message;
-            NetworkDevice clientDevice = msgEvt.device;
             Message response = null;
             try
             {
@@ -95,11 +78,6 @@ namespace UOS
                             HandleNotify(message, clientDevice);
                             break;
 
-                        //case Message.Type.ENCAPSULATED_MESSAGE:
-                        //    logger.Log("Incoming Encapsulated Message");
-                        //    HandleEncapsulatedMessage(message, clientDevice);
-                        //    break;
-
                         default:
                             break;
                     }
@@ -107,7 +85,7 @@ namespace UOS
             }
             catch (System.Exception ex)
             {
-                PushEvent(new LogEvent("Failure to handle the incoming message. ", ex));
+                PushLog("Failure to handle the incoming message. ", ex);
 
                 response = new Notify();
                 response.error = "Failure to handle the incoming message. ";
@@ -116,19 +94,16 @@ namespace UOS
             if (response != null)
             {
                 string msg = Json.Serialize(response.ToJSON()) + "\n";
-                UnityEngine.Debug.Log(msg);
                 byte[] bytes = Encoding.UTF8.GetBytes(msg);
-                msgEvt.connection.WriteAsync(
-                    bytes,
-                    new ClientConnection.WriteCallback(
-                        delegate(int written, object state, System.Exception e)
-                        {
-                            if (e != null)
-                                PushEvent(new LogEvent("Error while responding. ", e));
-                            else
-                                PushEvent(new LogEvent("Responded successfully."));
-                        }),
-                    null);
+                try
+                {
+                    connection.Write(bytes, 0, bytes.Length);
+                    PushLog("Responded successfully.");
+                }
+                catch (System.Exception e)
+                {
+                    PushLog("Error while responding. ", e);
+                }
             }
         }
 
@@ -137,13 +112,13 @@ namespace UOS
             try
             {
                 Call serviceCall = Call.FromJSON(Json.Deserialize(message));
-                Response response = gateway.driverManager.HandleServiceCall(serviceCall, messageContext);
+                Response response = gateway.HandleServiceCall(serviceCall, messageContext);
                 logger.Log("Returning service response");
                 return response;
             }
             catch (System.Exception e)
             {
-                PushEvent(new LogEvent("Internal Failure: ", e));
+                PushLog("Internal Failure: ", e);
 
                 Response errorResponse = new Response();
                 errorResponse.error = e.Message == null ? "Internal Error" : e.Message;
@@ -164,7 +139,7 @@ namespace UOS
             }
             catch (System.Exception e)
             {
-                PushEvent(new LogEvent("Internal Failure. Notify cannot be handled. ", e));
+                PushLog("Internal Failure. Notify cannot be handled. ", e);
             }
         }
 
@@ -185,12 +160,6 @@ namespace UOS
                 thread.Start();
             }
 
-            private void PushMessage(ClientConnection con, string message)
-            {
-                if ((message != null) && ((message = message.Trim()).Length > 0))
-                    gatewayServer.PushEvent(new MessageEvent(device, con, message));
-            }
-
             private void ConnectionThread()
             {
                 ClientConnection con = null;
@@ -202,19 +171,19 @@ namespace UOS
                         con = gatewayServer.gateway.OpenPassiveConnection(device.networkDeviceName, device.networkDeviceType);
                         if (con != null)
                         {
-                            gatewayServer.PushEvent(new LogEvent(
-                                            "Connection received from an ubiquitos-client device: '" +
-                                            con.clientDevice.networkDeviceName + "' on '" + con.clientDevice.networkDeviceType + "'."));
+                            gatewayServer.PushLog(
+                                    "Connection received from an ubiquitos-client device: '" +
+                                    con.clientDevice.networkDeviceName + "' on '" + con.clientDevice.networkDeviceType + "'.");
                         }
                         else
-                            throw new System.Exception("Couldn't estabilish connection to client.");
+                            throw new System.Exception("Couldn't establish connection to client.");
 
                         while (gatewayServer.running && con.connected)
                         {
                             StringBuilder builder = new StringBuilder();
                             byte[] data = new byte[1024];
                             int read;
-                            while ((read = con.Read(data, 0, data.Length)) > 0)
+                            while ((read = (data = con.Read()).Length) > 0)
                             {
                                 string[] msgs = Encoding.UTF8.GetString(data, 0, read).Split('\n');
                                 int last = msgs.Length - 1;
@@ -227,14 +196,14 @@ namespace UOS
                                     builder.Append(msgs[i++]);
                                     if ((msgs.Length > 1) || (lastByte == '\n'))
                                     {
-                                        PushMessage(con, builder.ToString());
+                                        gatewayServer.HandleMessage(builder.ToString(), device, con);
                                         builder.Length = 0;
                                     }
                                 }
 
                                 // Processes intermediate messages...
                                 for (; i < last; ++i)
-                                    PushMessage(con, msgs[i]);
+                                    gatewayServer.HandleMessage(msgs[i], device, con);
 
                                 // Processes the last chunk...
                                 if (i == last)
@@ -242,7 +211,7 @@ namespace UOS
                                     builder.Append(msgs[i]);
                                     if (lastByte == '\n')
                                     {
-                                        PushMessage(con, builder.ToString());
+                                        gatewayServer.HandleMessage(builder.ToString(), device, con);
                                         builder.Length = 0;
                                     }
                                 }
@@ -257,7 +226,7 @@ namespace UOS
                     catch (System.Exception e)
                     {
                         if (con != null) con.Close();
-                        gatewayServer.PushEvent(new LogEvent("Failed to handle ubiquitos-smartspace connection. ", e));
+                        gatewayServer.PushLog("Failed to handle ubiquitos-smartspace connection. ", e);
                     }
                 }
             }

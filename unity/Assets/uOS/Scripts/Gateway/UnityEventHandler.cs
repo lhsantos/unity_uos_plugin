@@ -71,6 +71,11 @@ namespace UOS
             }
         }
 
+        protected void PushLog(string message = "", System.Exception exception = null, string stackTrace = null)
+        {
+            PushEvent(new LogEvent(message, exception, stackTrace));
+        }
+
         protected abstract void HandleEvent(object o);
     }
 }

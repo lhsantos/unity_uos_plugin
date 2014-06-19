@@ -49,23 +49,21 @@ namespace UOS
 
 
         public Logger logger { get; private set; }
+        public UOSApplication app { get; set; }
         public DriverManager driverManager { get; private set; }
         public DeviceManager deviceManager { get; private set; }
+        public UpDevice currentDevice { get { return deviceManager.currentDevice; } }
 
 
         /// <summary>
         /// Creates a new Gateway with given settings.
         /// </summary>
         /// <param name="uOSSettings"></param>
-        public UnityGateway(uOSSettings uOSSettings, Logger logger)
+        public UnityGateway(uOSSettings uOSSettings, Logger logger, UOSApplication app = null)
         {
             this.settings = uOSSettings;
             this.logger = logger;
-
-            PrepareChannels();
-            PrepareDeviceAndDrivers();
-            PrepareServer();
-            PrepareRadar();
+            this.app = app;
         }
 
         /// <summary>
@@ -73,6 +71,14 @@ namespace UOS
         /// </summary>
         public void Init()
         {
+            PrepareChannels();
+            PrepareDeviceAndDrivers();
+            PrepareServer();
+            PrepareRadar();
+
+            if (app != null)
+                app.Init(this, settings);
+
             server.Init();
 
             if (radar != null)
@@ -97,6 +103,9 @@ namespace UOS
                 cm.TearDown();
             channelManagers.Clear();
             channelManagers = null;
+
+            if (app != null)
+                app.TearDown();
         }
 
         /// <summary>
@@ -122,12 +131,13 @@ namespace UOS
         }
 
         /// <summary>
-        /// Retrieves the uOS device this app is running on.
+        /// Lists all drivers found so far.
         /// </summary>
+        /// <param name="driverName"></param>
         /// <returns></returns>
-        public UpDevice GetCurrentDevice()
+        public List<DriverData> ListDrivers(string driverName)
         {
-            return deviceManager.currentDevice;
+            return driverManager.ListDrivers(driverName, null);
         }
 
         /// <summary>
@@ -139,6 +149,11 @@ namespace UOS
             return deviceManager.ListDevices();
         }
 
+        public UpDevice RetrieveDevice(string networkAddress, string networkType)
+        {
+            return deviceManager.RetrieveDevice(networkAddress, networkType);
+        }
+
         public ChannelManager GetChannelManager(string networkDeviceType)
         {
             ChannelManager cm = null;
@@ -146,6 +161,50 @@ namespace UOS
                 return cm;
 
             return null;
+        }
+
+        public NetworkDevice GetAvailableNetworkDevice(string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.GetAvailableNetworkDevice();
+        }
+
+        public ClientConnection OpenActiveConnection(string networkDeviceName, string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.OpenActiveConnection(networkDeviceName);
+        }
+
+        public ClientConnection OpenPassiveConnection(string networkDeviceName, string networkDeviceType)
+        {
+            ChannelManager cm = GetChannelManager(networkDeviceType);
+            return cm == null ? null : cm.OpenPassiveConnection(networkDeviceName);
+        }
+
+        /// <summary>
+        /// Starts an asynchronous service call that will notify callback when any response is done.
+        /// </summary>
+        /// <param name="device"></param>
+        /// <param name="serviceCall"></param>
+        /// <param name="callback"></param>
+        /// <param name="state"></param>
+        public void CallServiceAsync(
+            UpDevice device,
+            Call serviceCall,
+            uOSServiceCallBack callback,
+            object state = null
+        )
+        {
+            uOSServiceCallInfo info = new uOSServiceCallInfo { device = device, call = serviceCall, asyncState = state };
+            new Thread(new ThreadStart(delegate()
+            {
+                try
+                {
+                    Response r = CallService(device, serviceCall);
+                    PushEvent(callback, info, r, null);
+                }
+                catch (System.Exception e) { PushEvent(callback, info, null, e); }
+            })).Start();
         }
 
         /// <summary>
@@ -156,96 +215,132 @@ namespace UOS
         /// <returns></returns>
         public Response CallService(UpDevice device, Call serviceCall)
         {
-            // State variables to hold thread response...
-            object _lock = new object();
-            bool ready = false;
-            System.Exception ex = null;
-            Response res = null;
-
-            // The thread that will call the service.
-            var t = new Thread(new ThreadStart(delegate()
-            {
-                try
-                {
-                    // Calls the service with a callback that updates local variables...
-                    CallService(
-                        device,
-                        serviceCall,
-                        delegate(uOSServiceCallInfo info, Response r, System.Exception e2)
-                        {
-                            res = r;
-                            lock (_lock)
-                            {
-                                ready = true;
-                                ex = e2;
-                            }
-                        });
-                }
-                catch (System.Exception e)
-                {
-                    // If there were any exceptions, stores them...
-                    lock (_lock)
-                    {
-                        ex = e;
-                    }
-                }
-            }));
-
-            // Starts the thread and busy waits for the response.
-            t.Start();
-            t.Join();
-
-            // Did any exception happen?
-            if (ex != null)
-                throw ex;
-            else
-                while (!ready) ;
-
-            // Returns response, if there were any.
-            if (ex != null)
-                throw ex;
-            else
-                return res;
-        }
-
-        /// <summary>
-        /// Starts an asynchronous service call that will notify callback when any response is done.
-        /// </summary>
-        /// <param name="device"></param>
-        /// <param name="serviceCall"></param>
-        /// <param name="callback"></param>
-        /// <param name="state"></param>
-        public void CallService(
-            UpDevice device,
-            Call serviceCall,
-            uOSServiceCallBack callback,
-            object state = null
-        )
-        {
             if (
                     (serviceCall == null) ||
                     (serviceCall.driver == null) || (serviceCall.driver.Length == 0) ||
                     (serviceCall.service == null) || (serviceCall.service.Length == 0))
                 throw new System.ArgumentException("Service Driver or Service Name is empty");
 
-            StreamConnectionThreadData[] streamData = null;
+            StreamConnectionThreadData[] streamConData = null;
 
             CallContext messageContext = new CallContext();
             messageContext.callerNetworkDevice = new LoopbackDevice(1);
 
             // In case of a Stream Service, a Stream Channel must be opened
-            //if (serviceCall.serviceType == ServiceType.STREAM)
-            //    streamData = OpenStreamChannel(device, serviceCall, messageContext);
+            if (serviceCall.serviceType == ServiceType.STREAM)
+                streamConData = OpenStreamChannel(device, serviceCall, messageContext);
 
             if (IsLocalCall(device))
-                LocalServiceCall(serviceCall, streamData, messageContext, callback, state);
+                return LocalServiceCall(serviceCall, streamConData, messageContext);
             else
-                RemoteServiceCall(device, serviceCall, streamData, messageContext, callback, state);
+                return RemoteServiceCall(device, serviceCall, streamConData, messageContext);
         }
 
-        public UpDevice RetrieveDevice(string networkAddress, string networkType)
+        private bool IsLocalCall(UpDevice device)
         {
-            return deviceManager.RetrieveDevice(networkAddress, networkType);
+            return
+                (device == null) ||
+                (device.name == null) ||
+                (device.name.Equals(currentDevice.name, System.StringComparison.InvariantCultureIgnoreCase));
+        }
+
+        private Response RemoteServiceCall(
+            UpDevice device,
+            Call serviceCall,
+            StreamConnectionThreadData[] streamData,
+            CallContext messageContext)
+        {
+            ClientConnection con = null;
+            try
+            {
+                // Opens a connection to the remote device.
+                UpNetworkInterface netInt = GetAppropriateInterface(device);
+                con = OpenActiveConnection(netInt.networkAddress, netInt.netType);
+                if (con == null)
+                    throw new System.Exception("Couldn't connect to target.");
+
+                // Encodes and sends call message.
+                string call = Json.Serialize(serviceCall.ToJSON()) + "\n";
+                Debug.Log(call);
+                byte[] data = Encoding.UTF8.GetBytes(call);
+                con.Write(data, 0, data.Length);
+
+                // Gets response.
+                Response r = null;
+                string returnedMessage = null;
+
+                data = con.Read();
+                if (data != null)
+                    returnedMessage = Encoding.UTF8.GetString(data);
+                if (returnedMessage != null)
+                {
+                    Debug.Log(returnedMessage);
+                    r = Response.FromJSON(Json.Deserialize(returnedMessage));
+                    r.messageContext = messageContext;
+
+                    con.Close();
+                    return r;
+                }
+                else
+                    throw new System.Exception("No response received from call.");
+            }
+            catch (System.Exception e)
+            {
+                if (con != null)
+                    con.Close();
+                CloseStreams(streamData);
+                throw new ServiceCallException(e.Message);
+            }
+        }
+
+        private Response LocalServiceCall(
+            Call serviceCall,
+            StreamConnectionThreadData[] streamData,
+            CallContext messageContext)
+        {
+            logger.Log("Handling Local ServiceCall");
+
+            try
+            {
+                Response response = HandleServiceCall(serviceCall, messageContext);
+                response.messageContext = messageContext;
+
+                return response;
+            }
+            catch (System.Exception e)
+            {
+                // if there was an opened stream channel, it must be closed
+                CloseStreams(streamData);
+                throw new ServiceCallException(e);
+            }
+        }
+
+        public Response HandleServiceCall(Call serviceCall, CallContext messageContext)
+        {
+            NetworkDevice netDevice = messageContext.callerNetworkDevice;
+            if (netDevice != null)
+            {
+                string addr = GetHost(netDevice.networkDeviceName);
+                string type = netDevice.networkDeviceType;
+                messageContext.callerDevice = deviceManager.RetrieveDevice(addr, type);
+            }
+
+            if (IsApplicationCall(serviceCall))
+            {
+                return HandleAppServiceCall(serviceCall, messageContext);
+            }
+            else
+                return driverManager.HandleServiceCall(serviceCall, messageContext);
+        }
+
+        private bool IsApplicationCall(Call serviceCall)
+        {
+            return (serviceCall.driver != null) && serviceCall.driver.Equals("app", System.StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        private Response HandleAppServiceCall(Call serviceCall, CallContext messageContext)
+        {
+            return null;
         }
 
         public void HandleNotify(Notify notify, UpDevice device)
@@ -313,24 +408,6 @@ namespace UOS
             return id.ToString();
         }
 
-        public NetworkDevice GetAvailableNetworkDevice(string networkDeviceType)
-        {
-            ChannelManager cm = GetChannelManager(networkDeviceType);
-            return cm == null ? null : cm.GetAvailableNetworkDevice();
-        }
-
-        public ClientConnection OpenActiveConnection(string networkDeviceName, string networkDeviceType)
-        {
-            ChannelManager cm = GetChannelManager(networkDeviceType);
-            return cm == null ? null : cm.OpenActiveConnection(networkDeviceName);
-        }
-
-        public ClientConnection OpenPassiveConnection(string networkDeviceName, string networkDeviceType)
-        {
-            ChannelManager cm = GetChannelManager(networkDeviceType);
-            return cm == null ? null : cm.OpenPassiveConnection(networkDeviceName);
-        }
-
         public static IPAddress GetLocalIP()
         {
             return System.Array.Find<IPAddress>(
@@ -343,7 +420,7 @@ namespace UOS
             return networkDeviceName.Split(':')[0];
         }
 
-        public static string GetChannelID(string networkDeviceName)
+        public static string GetPort(string networkDeviceName)
         {
             return networkDeviceName.Split(':')[1];
         }
@@ -443,120 +520,6 @@ namespace UOS
             }
         }
 
-        private bool IsLocalCall(UpDevice device)
-        {
-            return
-                (device == null) ||
-                (device.name == null) ||
-                (device.name.Equals(GetCurrentDevice().name, System.StringComparison.InvariantCultureIgnoreCase));
-        }
-
-        private void RemoteServiceCall(
-            UpDevice device,
-            Call serviceCall,
-            StreamConnectionThreadData[] streamData,
-            CallContext messageContext,
-            uOSServiceCallBack callback,
-            object state)
-        {
-            UpNetworkInterface netInt = GetAppropriateInterface(device);
-            ClientConnection con = OpenActiveConnection(netInt.networkAddress, netInt.netType);
-            if (con == null)
-                throw new System.Exception("Couldn't connect to target.");
-
-            uOSServiceCallInfo info = new uOSServiceCallInfo { device = device, call = serviceCall, asyncState = state };
-            string call = Json.Serialize(serviceCall.ToJSON()) + "\n";
-            Debug.Log(call);
-            byte[] data = Encoding.UTF8.GetBytes(call);
-
-            con.WriteAsync(
-                data,
-                new ClientConnection.WriteCallback(
-                    delegate(int bytesWriten, object callerState, System.Exception writeException)
-                    {
-                        if (writeException != null)
-                        {
-                            con.Close();
-
-                            PushEvent(callback, info, null, writeException);
-                        }
-                        else
-                        {
-                            con.ReadAsync(
-                                new ClientConnection.ReadCallback(
-                                    delegate(byte[] bytes, object ce, System.Exception readException)
-                                    {
-                                        con.Close();
-
-                                        Response r = null;
-                                        string returnedMessage = null;
-                                        if (readException == null)
-                                        {
-                                            if (bytes != null)
-                                                returnedMessage = Encoding.UTF8.GetString(bytes);
-                                            if (returnedMessage != null)
-                                            {
-                                                try
-                                                {
-                                                    r = Response.FromJSON(Json.Deserialize(returnedMessage));
-                                                    r.messageContext = messageContext;
-                                                }
-                                                catch (System.Exception jsonException)
-                                                {
-                                                    readException = jsonException;
-                                                }
-                                            }
-                                            else
-                                                readException = new System.Exception("No response received from call.");
-                                        }
-                                        PushEvent(callback, info, r, readException);
-                                    }
-                                ),
-                                callerState
-                            );
-                        }
-                    }
-                ),
-                state
-            );
-        }
-
-        private void LocalServiceCall(
-            Call serviceCall,
-            StreamConnectionThreadData[] streamData,
-            CallContext messageContext,
-            uOSServiceCallBack callback,
-            object state)
-        {
-            return;
-
-            logger.Log("Handling Local ServiceCall");
-
-            try
-            {
-                Response response = null;
-
-                NetworkDevice netDevice = messageContext.callerNetworkDevice;
-                if (netDevice != null)
-                {
-                    string addr = GetHost(netDevice.networkDeviceName);
-                    string type = netDevice.networkDeviceType;
-                    messageContext.callerDevice = deviceManager.RetrieveDevice(addr, type);
-                }
-
-                //HandleDriverServiceCall(serviceCall, messageContext);
-
-                response.messageContext = messageContext;
-
-                //return response;
-            }
-            catch (System.Exception)
-            {
-                CloseStreams(streamData);
-                throw;
-            }
-        }
-
         private void CloseStreams(StreamConnectionThreadData[] streamData)
         {
             if (streamData != null)
@@ -587,7 +550,7 @@ namespace UOS
             for (int i = 0; i < channels; i++)
             {
                 NetworkDevice networkDevice = GetAvailableNetworkDevice(netType);
-                channelIDs[i] = GetChannelID(networkDevice.networkDeviceName);
+                channelIDs[i] = GetPort(networkDevice.networkDeviceName);
                 StreamConnectionThreadData thread = new StreamConnectionThreadData(this, messageContext, networkDevice);
                 thread.thread.Start();
                 data[i] = thread;
@@ -605,7 +568,7 @@ namespace UOS
             List<UpNetworkInterface> compatibleNetworks = new List<UpNetworkInterface>();
 
             //Solves the different network link problem:
-            foreach (UpNetworkInterface thisNetInterface in GetCurrentDevice().networks)
+            foreach (UpNetworkInterface thisNetInterface in currentDevice.networks)
             {
                 foreach (UpNetworkInterface providerNetInterface in deviceProvider.networks)
                 {
