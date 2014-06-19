@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 
 
@@ -119,60 +118,7 @@ namespace UOS
                 model = list[0];
             }
 
-            return CallServiceOnDriver(serviceCall, instances[model.rowid], messageContext);
-        }
-
-        private Response CallServiceOnDriver(Call serviceCall, object instanceDriver, CallContext messageContext)
-        {
-            MethodInfo serviceMethod = FindMethod(serviceCall, instanceDriver);
-            if (serviceMethod != null)
-            {
-                logger.Log(
-                    "Calling service (" + serviceCall.service +
-                    ") on Driver (" + serviceCall.driver +
-                    ") in instance (" + serviceCall.instanceId + ")");
-
-                HandleStreamCall(serviceCall, messageContext);
-
-                Response response = new Response();
-                serviceMethod.Invoke(instanceDriver, new object[] { serviceCall, response, messageContext });
-
-                logger.Log("Finished service call.");
-                return response;
-            }
-            else
-                throw new System.Exception(
-                    "No Service Implementation found for service '" + serviceCall.service +
-                    "' on driver '" + serviceCall.driver +
-                    "' with id '" + serviceCall.instanceId + "'");
-        }
-
-        private MethodInfo FindMethod(Call serviceCall, object instanceDriver)
-        {
-            string serviceName = serviceCall.service;
-
-            foreach (var m in instanceDriver.GetType().GetMethods())
-            {
-                if (m.Name.Equals(serviceName, System.StringComparison.InvariantCultureIgnoreCase))
-                    return m;
-            }
-
-            return null;
-        }
-
-        private void HandleStreamCall(Call serviceCall, CallContext messageContext)
-        {
-            if (serviceCall.serviceType == ServiceType.STREAM)
-            {
-                NetworkDevice networkDevice = messageContext.callerNetworkDevice;
-
-                string host = UnityGateway.GetHost(networkDevice.networkDeviceName);
-                for (int i = 0; i < serviceCall.channels; i++)
-                {
-                    ClientConnection con = gateway.OpenActiveConnection(host + ":" + serviceCall.channelIDs[i], serviceCall.channelType);
-                    messageContext.AddConnection(con);
-                }
-            }
+            return gateway.reflectionServiceCaller.CallService(instances[model.rowid], serviceCall, messageContext);
         }
 
         /// <summary>

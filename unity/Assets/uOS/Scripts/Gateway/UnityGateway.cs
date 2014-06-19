@@ -49,6 +49,7 @@ namespace UOS
 
 
         public Logger logger { get; private set; }
+        public ReflectionServiceCaller reflectionServiceCaller { get; private set; }
         public UOSApplication app { get; set; }
         public DriverManager driverManager { get; private set; }
         public DeviceManager deviceManager { get; private set; }
@@ -63,6 +64,7 @@ namespace UOS
         {
             this.settings = uOSSettings;
             this.logger = logger;
+            this.reflectionServiceCaller = new ReflectionServiceCaller(uOSSettings, this);
             this.app = app;
         }
 
@@ -327,7 +329,9 @@ namespace UOS
 
             if (IsApplicationCall(serviceCall))
             {
-                return HandleAppServiceCall(serviceCall, messageContext);
+                if (app == null)
+                    throw new System.InvalidOperationException("No valid app instance set.");
+                return reflectionServiceCaller.CallService(app, serviceCall, messageContext);
             }
             else
                 return driverManager.HandleServiceCall(serviceCall, messageContext);
@@ -336,11 +340,6 @@ namespace UOS
         private bool IsApplicationCall(Call serviceCall)
         {
             return (serviceCall.driver != null) && serviceCall.driver.Equals("app", System.StringComparison.InvariantCultureIgnoreCase);
-        }
-
-        private Response HandleAppServiceCall(Call serviceCall, CallContext messageContext)
-        {
-            return null;
         }
 
         public void HandleNotify(Notify notify, UpDevice device)

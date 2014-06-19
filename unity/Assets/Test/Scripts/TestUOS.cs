@@ -5,8 +5,9 @@ using System.Net.Sockets;
 
 
 [RequireComponent(typeof(uOS))]
-public class TestUOS : MonoBehaviour, Logger
+public class TestUOS : MonoBehaviour, Logger, UOSApplication
 {
+    UnityGateway gateway;
     string myLog = "";
 
     /// <summary>
@@ -20,7 +21,10 @@ public class TestUOS : MonoBehaviour, Logger
         //Debug.Log("aceitou!");
         //client.Close();
         //tcpListener.Stop();
-        uOS.Init(this);
+        uOS.Init(this, this);
+
+        Response r = uOS.gateway.CallService(uOS.gateway.currentDevice, new Call("app", "AppCall"));
+        Log(MiniJSON.Json.Serialize(r.ToJSON()));
     }
 
     /// <summary>
@@ -32,7 +36,27 @@ public class TestUOS : MonoBehaviour, Logger
 
     void OnGUI()
     {
-        myLog = GUI.TextArea(new Rect(10, 10, Screen.width - 10, Screen.height - 10), myLog);
+        int w = Screen.width, h = Screen.height;
+        Vector2 border = new Vector2(10, 10);
+        Vector2 halfArea = new Vector2(w / 2.0f - border.x, h / 2.0f - border.y);
+        Rect devRect = new Rect(border.x, border.y, halfArea.x * 2, halfArea.y);
+        Rect logRect = new Rect(border.x, border.y + halfArea.y, halfArea.x * 2, halfArea.y);
+
+
+        List<UpDevice> devices = new List<UpDevice>();
+        devices.Add(uOS.gateway.currentDevice);
+        devices.AddRange(uOS.gateway.ListDevices());
+
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine("Known devices:\n");
+        foreach (var d in devices)
+        {
+            builder.AppendLine(MiniJSON.Json.Serialize(d.ToJSON()));
+            builder.AppendLine();
+        }
+
+        GUI.TextArea(devRect, builder.ToString());
+        GUI.TextArea(logRect, myLog);
     }
 
 
@@ -61,5 +85,27 @@ public class TestUOS : MonoBehaviour, Logger
     {
         Debug.Log(msg);
         myLog = msg + "\n" + myLog;
+    }
+
+
+    void UOSApplication.Init(IGateway gateway, uOSSettings settings)
+    {
+        this.gateway = gateway as UnityGateway;
+    }
+
+    void UOSApplication.TearDown()
+    {
+    }
+
+
+    /// <summary>
+    /// App service example!
+    /// </summary>
+    /// <param name="serviceCall"></param>
+    /// <param name="serviceResponse"></param>
+    /// <param name="messageContext"></param>
+    public void AppCall(Call serviceCall, Response serviceResponse, CallContext messageContext)
+    {
+        Log("AppCall!");
     }
 }

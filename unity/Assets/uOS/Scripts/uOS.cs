@@ -48,15 +48,27 @@ public sealed class uOS : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// The current settings for uOS.
+    /// </summary>
     public static uOSSettings settings { get { return uOSSettings.instance; } }
 
+    /// <summary>
+    /// Is there a valid uOS instance and is it ready?
+    /// </summary>
     public static bool ready { get { return instance._ready; } }
 
+    /// <summary>
+    /// If there is a valid ready uOS instance, retrieves its gateway.
+    /// </summary>
     public static IGateway gateway { get { return readyInstance._gateway; } }
 
     private bool _ready;
     private UnityGateway _gateway;
 
+    /// <summary>
+    /// Called when this game component is created at the scene.
+    /// </summary>
     void Awake()
     {
         if (_instance == null)
@@ -65,16 +77,25 @@ public sealed class uOS : MonoBehaviour
             throw new System.InvalidOperationException("The scene must not contain more than one instance of uOS");
     }
 
+    /// <summary>
+    /// Called when this game component is disabled at the scene.
+    /// </summary>
     void OnDisable()
     {
         CheckDestroy();
     }
 
+    /// <summary>
+    /// Called when this game component is destroyed.
+    /// </summary>
     void OnDestroy()
     {
         CheckDestroy();
     }
 
+    /// <summary>
+    /// Tears down the middleware when the game component is no longer valid.
+    /// </summary>
     private void CheckDestroy()
     {
         if (_instance == this)
@@ -84,7 +105,12 @@ public sealed class uOS : MonoBehaviour
         }
     }
 
-    public static void Init(Logger plogger = null)
+    /// <summary>
+    /// Initialises the uOS middleware with given app call handler and optional logger.
+    /// </summary>
+    /// <param name="app">The instance of of UOSApplication that will handle app service calls (it may be null).</param>
+    /// <param name="plogger"></param>
+    public static void Init(UOSApplication app, Logger plogger = null)
     {
         if (plogger != null)
             logger = plogger;
@@ -93,7 +119,7 @@ public sealed class uOS : MonoBehaviour
         {
             logger.Log("uOS init");
 
-            _instance._gateway = new UnityGateway(settings, logger);
+            _instance._gateway = new UnityGateway(settings, logger, app);
             _instance._gateway.Init();
 
             _instance._ready = true;
@@ -102,6 +128,9 @@ public sealed class uOS : MonoBehaviour
             logger.LogWarning("uOS already initiated!");
     }
 
+    /// <summary>
+    /// Releases resources and tears down the middleware.
+    /// </summary>
     public static void TearDown()
     {
         if (ready)
@@ -117,6 +146,9 @@ public sealed class uOS : MonoBehaviour
             logger.LogWarning("uOS already dead!");
     }
 
+    /// <summary>
+    /// Called on every frame of the game.
+    /// </summary>
     void Update()
     {
         if (instance != this)
