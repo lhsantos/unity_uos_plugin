@@ -1,11 +1,10 @@
 ﻿using MiniJSON;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-
+using UOS.Net;
 
 namespace UOS
 {
@@ -322,7 +321,7 @@ namespace UOS
             NetworkDevice netDevice = messageContext.callerNetworkDevice;
             if (netDevice != null)
             {
-                string addr = GetHost(netDevice.networkDeviceName);
+                string addr = Util.GetHost(netDevice.networkDeviceName);
                 string type = netDevice.networkDeviceType;
                 messageContext.callerDevice = deviceManager.RetrieveDevice(addr, type);
             }
@@ -407,27 +406,9 @@ namespace UOS
             return id.ToString();
         }
 
-        public static IPAddress GetLocalIP()
-        {
-            return System.Array.Find<IPAddress>(
-                Dns.GetHostEntry(Dns.GetHostName()).AddressList,
-                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
-        }
-
-        public static string GetHost(string networkDeviceName)
-        {
-            return networkDeviceName.Split(':')[0];
-        }
-
-        public static string GetPort(string networkDeviceName)
-        {
-            return networkDeviceName.Split(':')[1];
-        }
-
-
         private void PrepareChannels()
         {
-            IPAddress myIP = GetLocalIP();
+            IPAddress myIP = IPAddress.GetLocal();
 
             channelManagers = new Dictionary<string, ChannelManager>();
             channelManagers["Ethernet:UDP"] = new UDPChannelManager(myIP, settings.eth.udp.port, settings.eth.udp.passivePortRange);
@@ -445,7 +426,7 @@ namespace UOS
                     currentDevice.name = name;
             }
             else
-                currentDevice.name = Dns.GetHostName();
+                currentDevice.name = IPAddress.GetLocalHostName();
 
             if ((currentDevice.name == null) || (currentDevice.name == "localhost"))
                 currentDevice.name = System.Environment.MachineName.ToLower() + "-unity";
@@ -458,7 +439,7 @@ namespace UOS
                 NetworkDevice nd = cm.GetAvailableNetworkDevice();
                 UpNetworkInterface nInf = new UpNetworkInterface();
                 nInf.netType = nd.networkDeviceType;
-                nInf.networkAddress = GetHost(nd.networkDeviceName);
+                nInf.networkAddress = Util.GetHost(nd.networkDeviceName);
                 networks.Add(nInf);
             }
 
@@ -549,7 +530,7 @@ namespace UOS
             for (int i = 0; i < channels; i++)
             {
                 NetworkDevice networkDevice = GetAvailableNetworkDevice(netType);
-                channelIDs[i] = GetPort(networkDevice.networkDeviceName);
+                channelIDs[i] = Util.GetPort(networkDevice.networkDeviceName);
                 StreamConnectionThreadData thread = new StreamConnectionThreadData(this, messageContext, networkDevice);
                 thread.thread.Start();
                 data[i] = thread;

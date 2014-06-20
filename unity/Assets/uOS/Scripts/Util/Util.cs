@@ -149,5 +149,16 @@ namespace UOS
 
             return builder.ToString();
         }
+
+
+        public static string GetHost(string networkDeviceName)
+        {
+            return networkDeviceName.Split(':')[0];
+        }
+
+        public static string GetPort(string networkDeviceName)
+        {
+            return networkDeviceName.Split(':')[1];
+        }
     }
 }

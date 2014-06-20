@@ -1,4 +1,4 @@
-﻿using System.Net;
+﻿using UOS.Net;
 
 
 namespace UOS
@@ -30,8 +30,5 @@ namespace UOS
             this.port = port;
             this.connectionType = connectionType;
         }
-
-        public SocketDevice(IPEndPoint ep, EthernetConnectionType connectionType)
-            : this(ep.Address.ToString(), ep.Port, connectionType) { }
     }
 }

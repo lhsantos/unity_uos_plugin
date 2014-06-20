@@ -1,6 +1,6 @@
-﻿using System.Net;
-using System.Net.Sockets;
-using System.Threading;
+﻿using System.Threading;
+using UOS.Net;
+using UOS.Net.Sockets;
 
 
 namespace UOS
@@ -13,8 +13,8 @@ namespace UOS
         public TCPServerConnection(SocketDevice networkDevice)
             : base(networkDevice)
         {
-            tcpListener = new TcpListener(IPAddress.Parse(networkDevice.host), networkDevice.port);
-            tcpListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            tcpListener = new TcpListener(networkDevice.host, networkDevice.port);
+            tcpListener.ReuseAddress = true;
             tcpListener.Start();
             running = true;
         }

@@ -1,7 +1,7 @@
 ﻿using System.IO;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
+using UOS.Net;
+using UOS.Net.Sockets;
 
 
 namespace UOS
@@ -11,14 +11,14 @@ namespace UOS
         private IPEndPoint peerAddress;
         private UdpClient udpClient;
 
-        public override bool connected { get { return udpClient.Client.Connected; } }
+        public override bool connected { get { return udpClient.Connected; } }
 
 
         public UDPClientConnection(string host, int port)
             : base(new SocketDevice(host, port, EthernetConnectionType.UDP))
         {
             peerAddress = new IPEndPoint(IPAddress.Parse(host), port);
-            udpClient = new UdpClient(peerAddress);
+            udpClient = new UdpClient(host, port);
             udpClient.Connect(peerAddress);
         }
 

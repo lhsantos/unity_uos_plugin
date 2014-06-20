@@ -57,7 +57,7 @@ namespace UOS
             {
                 NetworkDevice networkDevice = messageContext.callerNetworkDevice;
 
-                string host = UnityGateway.GetHost(networkDevice.networkDeviceName);
+                string host = Util.GetHost(networkDevice.networkDeviceName);
                 for (int i = 0; i < serviceCall.channels; i++)
                 {
                     ClientConnection con = gateway.OpenActiveConnection(host + ":" + serviceCall.channelIDs[i], serviceCall.channelType);

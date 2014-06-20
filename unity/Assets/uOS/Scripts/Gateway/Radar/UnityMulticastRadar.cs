@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
+using UOS.Net;
+using UOS.Net.Sockets;
 
 
 namespace UOS
@@ -42,12 +42,12 @@ namespace UOS
                 lastAddresses = new HashSet<string>();
 
                 udpClient = new UdpClient();
-                udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                udpClient.ReuseAddress = true;
                 udpClient.EnableBroadcast = true;
-                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
-                udpClient.Client.ReceiveTimeout = 10 * 1000; // ten seconds
+                udpClient.Bind(new IPEndPoint(IPAddress.Any, port));
+                udpClient.ReceiveTimeout = 10 * 1000; // ten seconds
 
-                localEndPoint = new IPEndPoint(UnityGateway.GetLocalIP(), port);
+                localEndPoint = new IPEndPoint(IPAddress.GetLocal(), port);
 
                 SendBeacon();
 
@@ -65,7 +65,7 @@ namespace UOS
                             }
                             catch (SocketException)
                             {
-                                // timout is expected!
+                                // Timeout is expected!
                                 SendBeacon();
                             }
                             catch (System.Exception e)

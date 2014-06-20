@@ -132,7 +132,7 @@ namespace UOS
             {
                 Notify notify = Notify.FromJSON(Json.Deserialize(message));
                 UpDevice device = gateway.RetrieveDevice(
-                    UnityGateway.GetHost(clientDevice.networkDeviceName),
+                    Util.GetHost(clientDevice.networkDeviceName),
                     clientDevice.networkDeviceType);
 
                 gateway.HandleNotify(notify, device);

@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.Net;
+using UOS.Net;
 
 
 namespace UOS

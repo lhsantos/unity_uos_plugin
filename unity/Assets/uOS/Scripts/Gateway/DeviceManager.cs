@@ -97,10 +97,10 @@ namespace UOS
                 return;
 
             // verify if device entered is the current device
-            string deviceHost = UnityGateway.GetHost(device.networkDeviceName);
+            string deviceHost = Util.GetHost(device.networkDeviceName);
             foreach (UpNetworkInterface networkInterface in this.currentDevice.networks)
             {
-                string currentDeviceHost = UnityGateway.GetHost(networkInterface.networkAddress);
+                string currentDeviceHost = Util.GetHost(networkInterface.networkAddress);
                 if (deviceHost != null && deviceHost.Equals(currentDeviceHost))
                 {
                     logger.Log("Host of device entered is the same of current device:" + device.networkDeviceName);
@@ -330,7 +330,7 @@ namespace UOS
             // Remove what services this device has.
             logger.Log("Device " + device.networkDeviceName + " of type " + device.networkDeviceType + " leaving.");
 
-            string host = UnityGateway.GetHost(device.networkDeviceName);
+            string host = Util.GetHost(device.networkDeviceName);
             List<UpDevice> devices;
             lock (_devicedao_lock) { devices = deviceDao.List(host, device.networkDeviceType); }
 
