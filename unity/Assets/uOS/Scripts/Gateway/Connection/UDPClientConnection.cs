@@ -18,7 +18,7 @@ namespace UOS
             : base(new SocketDevice(host, port, EthernetConnectionType.UDP))
         {
             peerAddress = new IPEndPoint(IPAddress.Parse(host), port);
-            udpClient = new UdpClient(host, port);
+            udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, port));
             udpClient.Connect(peerAddress);
         }
 

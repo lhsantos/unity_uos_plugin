@@ -197,15 +197,17 @@ namespace UOS
         )
         {
             uOSServiceCallInfo info = new uOSServiceCallInfo { device = device, call = serviceCall, asyncState = state };
-            new Thread(new ThreadStart(delegate()
-            {
-                try
+            new Thread(new ThreadStart(
+                delegate()
                 {
-                    Response r = CallService(device, serviceCall);
-                    PushEvent(callback, info, r, null);
-                }
-                catch (System.Exception e) { PushEvent(callback, info, null, e); }
-            })).Start();
+                    try
+                    {
+                        Response r = CallService(device, serviceCall);
+                        PushEvent(callback, info, r, null);
+                    }
+                    catch (System.Exception e) { PushEvent(callback, info, null, e); }
+                })
+            ).Start();
         }
 
         /// <summary>
@@ -290,7 +292,7 @@ namespace UOS
                 if (con != null)
                     con.Close();
                 CloseStreams(streamData);
-                throw new ServiceCallException(e.Message);
+                throw new ServiceCallException(e);
             }
         }
 

@@ -214,9 +214,9 @@ namespace UOS.Net.Sockets
             this.internalClient = new System.Net.Sockets.UdpClient();
         }
 
-        public UdpClient(string hostname, int port)
+        public UdpClient(IPEndPoint ep)
         {
-            this.internalClient = new System.Net.Sockets.UdpClient(hostname, port);
+            this.internalClient = new System.Net.Sockets.UdpClient(ep.internalEP);
         }
 
         public bool EnableBroadcast
@@ -280,7 +280,12 @@ namespace UOS.Net.Sockets
                 remoteEP = new IPEndPoint(aux);
                 return data;
             }
-            catch (System.Net.Sockets.SocketException e) { throw new SocketException(e); }
+            catch (System.Net.Sockets.SocketException e)
+            {
+                if (e.SocketErrorCode == System.Net.Sockets.SocketError.TimedOut)
+                    throw new SocketTimoutException(e);
+                throw;
+            }
         }
 
         public void Close()

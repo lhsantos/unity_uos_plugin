@@ -63,7 +63,7 @@ namespace UOS
                                 if (!localEndPoint.Equals(endPoint))
                                     PushEvent(new ReceiveEvent() { data = msg, remoteEndPoint = endPoint });
                             }
-                            catch (SocketException)
+                            catch (SocketTimoutException)
                             {
                                 // Timeout is expected!
                                 SendBeacon();

@@ -112,11 +112,11 @@ public sealed class uOS : MonoBehaviour
     /// <param name="plogger"></param>
     public static void Init(UOSApplication app, Logger plogger = null)
     {
-        if (plogger != null)
-            logger = plogger;
-
         if (!ready)
         {
+            if (plogger != null)
+                logger = plogger;
+
             logger.Log("uOS init");
 
             _instance._gateway = new UnityGateway(settings, logger, app);

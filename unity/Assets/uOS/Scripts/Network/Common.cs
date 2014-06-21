@@ -1,8 +1,8 @@
 ﻿namespace UOS.Net.Sockets
 {
-    public class SocketException : System.Exception
+    public class SocketTimoutException : System.Exception
     {
-        public SocketException(System.Exception e)
+        public SocketTimoutException(System.Exception e)
             : base(null, e) { }
     }
 }
