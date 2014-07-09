@@ -58,7 +58,8 @@ namespace UOS
 #endif
 
 
-
+        //ubiquitos.uos.deviceName=unity_uos
+        public string deviceName = "unity_uos";
 
         //ubiquitos.radar=br.unb.unbiquitous.ubiquitos.network.ethernet.radar.EthernetArpRadar
         //ubiquitos.connectionManager=org.unbiquitous.uos.network.socket.connectionManager.EthernetTCPConnectionManager, org.unbiquitous.uos.network.socket.connectionManager.EthernetUDPConnectionManager
@@ -70,14 +71,19 @@ namespace UOS
         //ubiquitos.bth
         public uOSBluetoothSettings bth = new uOSBluetoothSettings();
 
+        //ubiquitos.web
+        public uOSWebSettings web = new uOSWebSettings();
+
         //ubiquitos.driver.deploylist=org.unbiquitous.uos.core.driver.DeviceDriverImpl;\
         //    org.unbiquitous.uos.core.driver.OntologyDriverImpl;\
         //    org.unbiquitous.uos.core.driver.UserDriver(My_user_driver);
 
-        //ubiquitos.uos.deviceName=DublinDevice
-        public string deviceName = "DublinDevice";
-
         public RadarType radarType;
+
+        /// <summary>
+        /// Name of the driver classes to load.
+        /// </summary>
+        public string[] drivers;
     }
 
     //ubiquitos.eth.tcp
@@ -134,6 +140,17 @@ namespace UOS
 
         //ubiquitos.bth.client=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
         public string client = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB";
+    }
+
+    //ubiquitos.web.port
+    [System.Serializable]
+    public class uOSWebSettings
+    {
+        //ubiquitos.websocket.port=8080
+        public int port = 8080;
+
+        //ubiquitos.websocket.timeout=1000
+        public int timout = 1000;
     }
 
     /// <summary>

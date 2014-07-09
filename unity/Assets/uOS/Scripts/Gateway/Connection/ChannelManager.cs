@@ -11,7 +11,7 @@ namespace UOS
 
         ClientConnection OpenActiveConnection(string networkDeviceName);
 
-        List<NetworkDevice> ListNetworkDevices();
+        List<string> ListHosts();
 
         NetworkDevice GetAvailableNetworkDevice();
 

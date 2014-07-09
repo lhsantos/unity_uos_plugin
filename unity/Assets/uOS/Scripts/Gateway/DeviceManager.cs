@@ -137,7 +137,7 @@ namespace UOS
                 call.AddParameter("device", Json.Serialize(currentDevice.ToJSON()));
 
                 Response response = gateway.CallService(dummyDevice, call);
-                if (response != null && ((response.error == null) || (response.error.Length == 0)))
+                if ((response != null) && string.IsNullOrEmpty(response.error))
                 {
                     // in case of a success greeting process, register the device in the neighborhood database
                     object responseDevice = response.GetResponseData("device");
@@ -169,6 +169,7 @@ namespace UOS
             }
             catch (System.Exception e)
             {
+                logger.Log(e.StackTrace);
                 logger.LogError("Not possible to handshake with device '" + device.networkDeviceName + "'. " + e.Message);
             }
 
@@ -196,8 +197,6 @@ namespace UOS
                     }
                     catch (System.Exception e)
                     {
-                        UnityEngine.Debug.Log(e);
-                        UnityEngine.Debug.Log(e.StackTrace);
                         logger.LogError(
                             "Problems occurred while registering drivers from device '" + upDevice.name + "' . " + e.Message);
                     }
@@ -207,7 +206,7 @@ namespace UOS
             {
                 logger.LogError(
                     "Not possible to discover services from device '" + device.networkDeviceName +
-                    "'. Possibly not a uOS Device");
+                    "'. Possibly not a uOS Device.");
             }
         }
 
@@ -254,8 +253,7 @@ namespace UOS
             {
                 Response equivalentDriverResponse = gateway.CallService(upDevice, call);
 
-                if ((equivalentDriverResponse != null) &&
-                    ((equivalentDriverResponse.error == null) || (equivalentDriverResponse.error.Length == 0)))
+                if ((equivalentDriverResponse != null) && string.IsNullOrEmpty(equivalentDriverResponse.error))
                 {
                     string interfaces = equivalentDriverResponse.GetResponseString(INTERFACES_KEY);
 

@@ -32,15 +32,6 @@ namespace UOS
         /// </summary>
         void TearDown();
 
-        //Response CallService(
-        //    UpDevice device,
-        //    string serviceName,
-        //    string driverName,
-        //    string instanceId,
-        //    string securityType,
-        //    IDictionary<string, object> parameters
-        //);
-
         /// <summary>
         /// Synchronous service call. This method will block until the service response is ready.
         /// </summary>
@@ -66,44 +57,46 @@ namespace UOS
             object state = null
         );
 
-        //void Register(
-        //    UosEventListener listener,
-        //    UpDevice device,
-        //    string driver,
-        //    string eventKey
-        //);
+        /// <summary>
+        /// Register a Listener for an event, driver and device specified.
+        /// </summary>
+        /// <param name="listener"></param>
+        /// <param name="device"></param>
+        /// <param name="driver"></param>
+        /// <param name="instanceId"></param>
+        /// <param name="eventKey"></param>
+        /// <param name="parameters"></param>
+        void Register(
+            UOSEventListener listener,
+            UpDevice device,
+            string driver,
+            string instanceId = null,
+            string eventKey = null,
+            IDictionary<string, object> parameters = null
+        );
 
-        //void Register(
-        //    UosEventListener listener,
-        //    UpDevice device,
-        //    string driver,
-        //    string instanceId,
-        //    string eventKey
-        //);
+        /// <summary>
+        /// Removes a listener for receiving Notify events and notifies the event driver of its removal.
+        /// </summary>
+        /// <param name="listener"></param>
+        /// <param name="device"></param>
+        /// <param name="driver"></param>
+        /// <param name="instanceId"></param>
+        /// <param name="eventKey"></param>
+        void Unregister(
+            UOSEventListener listener,
+            UpDevice device = null,
+            string driver = null,
+            string instanceId = null,
+            string eventKey = null
+        );
 
-        //void Register(
-        //    UosEventListener listener,
-        //    UpDevice device,
-        //    string driver,
-        //    string instanceId,
-        //    string eventKey,
-        //    IDictionary<string, object> parameters
-        //);
-
-        //void Unregister(UosEventListener listener);
-
-        //void Unregister(
-        //    UosEventListener listener,
-        //    UpDevice device,
-        //    string driver,
-        //    string instanceId,
-        //    string eventKey
-        //);
-
-        //void DoNotify(
-        //    Notify notify,
-        //    UpDevice device
-        //);
+        /// <summary>
+        /// Sends a notify message to the device informed.
+        /// </summary>
+        /// <param name="device"></param>
+        /// <param name="notify"></param>
+        void Notify(Notify notify, UpDevice device);
 
         /// <summary>
         /// Lists all drivers found so far.

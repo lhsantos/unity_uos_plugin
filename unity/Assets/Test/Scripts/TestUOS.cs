@@ -15,9 +15,6 @@ public class TestUOS : MonoBehaviour, Logger, UOSApplication
     void Start()
     {
         uOS.Init(this, this);
-
-        Response r = uOS.gateway.CallService(uOS.gateway.currentDevice, new Call("app", "AppCall"));
-        Log(MiniJSON.Json.Serialize(r.ToJSON()));
     }
 
     /// <summary>
@@ -36,9 +33,7 @@ public class TestUOS : MonoBehaviour, Logger, UOSApplication
         Rect logRect = new Rect(border.x, border.y + halfArea.y, halfArea.x * 2, halfArea.y);
 
 
-        List<UpDevice> devices = new List<UpDevice>();
-        devices.Add(uOS.gateway.currentDevice);
-        devices.AddRange(uOS.gateway.ListDevices());
+        List<UpDevice> devices = new List<UpDevice>(uOS.gateway.ListDevices());
 
         var builder = new System.Text.StringBuilder();
         builder.AppendLine("Known devices:\n");

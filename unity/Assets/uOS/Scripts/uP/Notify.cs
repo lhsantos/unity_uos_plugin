@@ -28,7 +28,7 @@ namespace UOS
             return AddParameter(key, (object)value);
         }
 
-        private Notify AddParameter(string key, object value)
+        public Notify AddParameter(string key, object value)
         {
             if (parameters == null)
                 parameters = new Dictionary<string, object>();

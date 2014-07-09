@@ -8,7 +8,7 @@ namespace UOS
 {
     public class TCPClientConnection : ClientConnection
     {
-        public const int TIMEOUT_TIME_MS = 10000;
+        public const int TIMEOUT_TIME_MS = 20000;
 
 
         private TcpClient tcpClient;

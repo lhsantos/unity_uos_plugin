@@ -124,21 +124,12 @@ namespace UOS
         /// <summary>
         /// Deploys a driver into the context.
         /// </summary>
-        /// <param name="driver">Object representing the interface of the Driver to be deployed.</param>
-        /// <param name="instance">Instance of the object implementing the informed Driver.</param>
-        public void DeployDriver(UpDriver driver, UOSDriver instance)
-        {
-            DeployDriver(driver, instance, null);
-        }
-
-        /// <summary>
-        /// Deploys a driver into the context.
-        /// </summary>
-        /// <param name="driver">Object representing the interface of the Driver to be deployed.</param>
         /// <param name="instance">Instance of the object implementing the informed Driver.</param>
         /// <param name="instanceId">Optional instanceId which to call this instance of the driver.</param>
-        public void DeployDriver(UpDriver driver, UOSDriver instance, string instanceId)
+        public void DeployDriver(UOSDriver instance, string instanceId = null)
         {
+            UpDriver driver = instance.GetDriver();
+
             if (instanceId == null)
                 instanceId = driver.name + IncDeployedDriversCount();
 
@@ -374,7 +365,7 @@ namespace UOS
             if (list.Count == 0)
             {
                 DeviceDriver deviceDriver = new DeviceDriver();
-                DeployDriver(deviceDriver.GetDriver(), deviceDriver);
+                DeployDriver(deviceDriver);
             }
 
             logger.Log("Initializing " + toInitialize.Count + " drivers.");

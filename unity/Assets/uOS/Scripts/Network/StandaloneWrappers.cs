@@ -1,4 +1,6 @@
 ﻿//#if UNITY_EDITOR || UNITY_STANDALONE
+using System.Collections.Generic;
+
 
 namespace UOS.Net
 {
@@ -37,6 +39,20 @@ namespace UOS.Net
                     a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
                 )
             );
+        }
+
+        public static List<IPAddress> ListLocal()
+        {
+            var ips =
+                System.Array.FindAll<System.Net.IPAddress>(
+                    System.Net.Dns.GetHostEntry(GetLocalHostName()).AddressList,
+                    a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                );
+
+            List<IPAddress> result = new List<IPAddress>(ips.Length);
+            foreach (var ip in ips)
+                result.Add(new IPAddress(ip));
+            return result;
         }
     }
 
@@ -162,9 +178,9 @@ namespace UOS.Net.Sockets
     public class TcpListener
     {
         private System.Net.Sockets.TcpListener listener;
-        public TcpListener(string host, int port)
+        public TcpListener(int port)
         {
-            this.listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Parse(host), port);
+            this.listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, port);
         }
 
         public bool ReuseAddress
@@ -194,7 +210,6 @@ namespace UOS.Net.Sockets
         {
             return listener.Pending();
         }
-
         public void Start()
         {
             listener.Start();

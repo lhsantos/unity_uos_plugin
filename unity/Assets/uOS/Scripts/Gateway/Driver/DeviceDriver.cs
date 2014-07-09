@@ -111,35 +111,19 @@ namespace UOS
                 serviceResponse.AddParameter(DEVICE_KEY, Json.Serialize(gateway.currentDevice.ToJSON()));
 
                 //TODO: actually implement the driver register for other devices...
-                //gateway.CallService(
-                //    device,
-                //    new Call("uos.DeviceDriver", "listDrivers"),
-                //    new uOSServiceCallBack(
-                //        delegate(uOSServiceCallInfo info, Response r, System.Exception e)
-                //        {
-                //            if ((e != null) || (r == null))
-                //            {
-                //                logger.LogError(
-                //                    "Problems on listing drivers for handshake: " +
-                //                    ((e != null) ? (e.Message + "," + e.StackTrace) : "no response"));
-                //            }
-                //            else
-                //            {
-                //                object driverList = r.GetResponseData("driverList");
-                //                if (driverList != null)
-                //                {
-                //                    var driverMap = Json.Deserialize(driverList as string) as IDictionary<string, object>;
-                //                    // TODO: this is duplicated with DeviceManager.registerRemoteDriverInstances
-                //                    foreach (string id in driverMap.Keys)
-                //                    {
-                //                        UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(driverMap[id] as string));
-                //                        gateway.driverManager.Register(id, upDriver, device.name);
-                //                    }
-                //                }
-                //            }
-                //        }
-                //    )
-                //);
+                //Response driversResponse = gateway.CallService(device, new Call("uos.DeviceDriver", "listDrivers"));
+                //object driverList = driversResponse.GetResponseData("driverList");
+                //if (driverList != null)
+                //{
+                //    var driverMap = (IDictionary<string, object>)Json.Deserialize(driverList.ToString());
+                //    // TODO: this is duplicated with DeviceManager.registerRemoteDriverInstances
+                //    foreach (string id in driverMap.Keys)
+                //    {
+                //        UpDriver upDriver = UpDriver.FromJSON(Json.Deserialize(driverMap[id].ToString()));
+                //        DriverModel driverModel = new DriverModel(id, upDriver, device.name);
+                //        gateway.driverManager.Insert(driverModel);
+                //    }
+                //}
             }
             catch (System.Exception e)
             {

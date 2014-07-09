@@ -26,7 +26,8 @@ namespace UOS
             {
                 running = true;
                 threads = new List<ServerThreadData>();
-                foreach (var device in gateway.GetChannelManager("Ethernet:TCP").ListNetworkDevices())
+                TCPChannelManager cm = (TCPChannelManager)gateway.GetChannelManager("Ethernet:TCP");
+                foreach (var device in cm.ListNetworkDevices())
                 {
                     ServerThreadData std = new ServerThreadData(this, device);
                     threads.Add(std);
@@ -48,13 +49,13 @@ namespace UOS
             throw new System.InvalidOperationException("Unexpected event on GatewayServer!");
         }
 
-        private void HandleMessage(string message, NetworkDevice clientDevice, ClientConnection connection)
+        private void HandleMessage(string message, ClientConnection connection)
         {
             if ((message == null) || ((message = message.Trim()).Length == 0) ||
-                (clientDevice == null) ||
                 (connection == null) || (!connection.connected))
                 return;
 
+            NetworkDevice clientDevice = connection.clientDevice;
             Message response = null;
             try
             {
@@ -196,14 +197,14 @@ namespace UOS
                                     builder.Append(msgs[i++]);
                                     if ((msgs.Length > 1) || (lastByte == '\n'))
                                     {
-                                        gatewayServer.HandleMessage(builder.ToString(), device, con);
+                                        gatewayServer.HandleMessage(builder.ToString(), con);
                                         builder.Length = 0;
                                     }
                                 }
 
                                 // Processes intermediate messages...
                                 for (; i < last; ++i)
-                                    gatewayServer.HandleMessage(msgs[i], device, con);
+                                    gatewayServer.HandleMessage(msgs[i], con);
 
                                 // Processes the last chunk...
                                 if (i == last)
@@ -211,7 +212,7 @@ namespace UOS
                                     builder.Append(msgs[i]);
                                     if (lastByte == '\n')
                                     {
-                                        gatewayServer.HandleMessage(builder.ToString(), device, con);
+                                        gatewayServer.HandleMessage(builder.ToString(), con);
                                         builder.Length = 0;
                                     }
                                 }

@@ -13,7 +13,7 @@ namespace UOS
         public TCPServerConnection(SocketDevice networkDevice)
             : base(networkDevice)
         {
-            tcpListener = new TcpListener(networkDevice.host, networkDevice.port);
+            tcpListener = new TcpListener(networkDevice.port);
             tcpListener.ReuseAddress = true;
             tcpListener.Start();
             running = true;

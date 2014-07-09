@@ -11,6 +11,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39a097e0dc7385542bdd8b0a43eb4c5d, type: 3}
   m_Name: uOSSettings
   m_EditorClassIdentifier: 
+  deviceName: 
   eth:
     tcp:
       port: 14984
@@ -23,5 +24,8 @@ MonoBehaviour:
   bth:
     provider: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     client: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-  deviceName: unity
+  web:
+    port: 8080
+    timout: 1000
   radarType: 0
+  drivers: []

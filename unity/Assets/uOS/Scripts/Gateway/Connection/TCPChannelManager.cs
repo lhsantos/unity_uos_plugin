@@ -32,7 +32,7 @@ namespace UOS
                 lowerPort = upperPort = defaultPort;
             }
 
-            string localHost = localIP.ToString();
+            string localHost = "0.0.0.0";
             passiveDevices.Add(new SocketDevice(localHost, defaultPort, EthernetConnectionType.TCP));
             for (int i = lowerPort; i <= upperPort; ++i)
                 passiveDevices.Add(new SocketDevice(localHost, i, EthernetConnectionType.TCP));
@@ -79,6 +79,15 @@ namespace UOS
             }
 
             return server.Accept();
+        }
+
+        public List<string> ListHosts()
+        {
+            var ips = IPAddress.ListLocal();
+            var result = new List<string>();
+            foreach (var ip in ips)
+                result.Add(ip.ToString());
+            return result;
         }
 
         public List<NetworkDevice> ListNetworkDevices()
