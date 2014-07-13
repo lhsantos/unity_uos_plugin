@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 
@@ -190,6 +192,14 @@ namespace UOS
                     return type;
             }
             return null;
+        }
+
+        public static IPAddress[] GetLocalIPs()
+        {
+            return Array.FindAll<IPAddress>(
+                    Dns.GetHostEntry(Dns.GetHostName()).AddressList,
+                    a => a.AddressFamily == AddressFamily.InterNetwork
+                );
         }
     }
 }

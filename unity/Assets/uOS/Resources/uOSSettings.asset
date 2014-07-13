@@ -24,8 +24,9 @@ MonoBehaviour:
   bth:
     provider: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     client: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-  web:
+  websocket:
+    hostName: localhost
     port: 8080
-    timout: 1000
+    timeout: 1000
   radarType: 0
   drivers: []

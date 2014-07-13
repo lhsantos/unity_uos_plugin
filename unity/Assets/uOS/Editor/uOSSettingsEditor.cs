@@ -15,6 +15,8 @@ public class uOSSettingsEditor : Editor
     private SerializedProperty udpPortProp;
     private SerializedProperty udpPortRangeProp;
     private SerializedProperty rtpPortRangeProp;
+    private SerializedProperty webHostNameProp;
+    private SerializedProperty webPortProp;
     private SerializedProperty radarTypeProp;
     private SerializedProperty driversProp;
 
@@ -31,6 +33,8 @@ public class uOSSettingsEditor : Editor
         udpPortProp = serializedObject.FindProperty("eth.udp.port");
         udpPortRangeProp = serializedObject.FindProperty("eth.udp.passivePortRange");
         rtpPortRangeProp = serializedObject.FindProperty("eth.rtp.passivePortRange");
+        webHostNameProp = serializedObject.FindProperty("websocket.hostName");
+        webPortProp = serializedObject.FindProperty("websocket.port");
         radarTypeProp = serializedObject.FindProperty("radarType");
         driversProp = serializedObject.FindProperty("drivers");
 
@@ -63,6 +67,9 @@ public class uOSSettingsEditor : Editor
             PortProp(udpPortProp, "UDP port:");
             PortRangeProp(udpPortRangeProp, "UDP passive range:");
             PortRangeProp(rtpPortRangeProp, "RTP passive range:");
+            string host = EditorGUILayout.TextField("WebSocket Host:", webHostNameProp.stringValue, GUILayout.ExpandWidth(true));
+            webHostNameProp.stringValue = GetValidHost(host);
+            PortProp(webPortProp, "WebSocket Port:"); 
             EditorGUI.indentLevel--;
         }
 
@@ -75,6 +82,15 @@ public class uOSSettingsEditor : Editor
         EditorGUILayout.EndVertical();
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private string GetValidHost(string host)
+    {
+        host = (host ?? "").Trim();
+        if (System.Uri.CheckHostName(host) == System.UriHostNameType.Unknown)
+            host = "localhost";
+
+        return host;
     }
 
     private void PortProp(SerializedProperty prop, string label)

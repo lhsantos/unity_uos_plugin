@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
-using UOS.Net;
-using UOS.Net.Sockets;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading;
 
 
@@ -17,7 +17,13 @@ namespace UOS
 
 
         public TCPClientConnection(TcpClient tcpClient)
-            : base(new SocketDevice(tcpClient.Host, tcpClient.Port, EthernetConnectionType.TCP))
+            : base(
+                new SocketDevice(
+                    ((IPEndPoint)tcpClient.Client.RemoteEndPoint).Address.ToString(),
+                    ((IPEndPoint)tcpClient.Client.RemoteEndPoint).Port,
+                    EthernetConnectionType.TCP
+                )
+            )
         {
             this.tcpClient = tcpClient;
         }
@@ -28,7 +34,7 @@ namespace UOS
         private static TcpClient CreateClient(string host, int port)
         {
             var tcpClient = new TcpClient();
-            tcpClient.ReuseAddress = true;
+            tcpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             tcpClient.Connect(host, port);
             tcpClient.ReceiveTimeout = TIMEOUT_TIME_MS;
             tcpClient.SendTimeout = TIMEOUT_TIME_MS;

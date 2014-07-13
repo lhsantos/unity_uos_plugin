@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading;
-using UOS.Net;
-using UOS.Net.Sockets;
 
 
 namespace UOS
@@ -23,7 +23,7 @@ namespace UOS
         public int port = 14984;
 
         private UdpClient udpClient = null;
-        private IPEndPoint localEndPoint;
+        private IPAddress[] localIPs;
 
         private System.DateTime lastCheck;
         private HashSet<string> lastAddresses;
@@ -42,12 +42,13 @@ namespace UOS
                 lastAddresses = new HashSet<string>();
 
                 udpClient = new UdpClient();
-                udpClient.ReuseAddress = true;
+                udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 udpClient.EnableBroadcast = true;
-                udpClient.Bind(new IPEndPoint(IPAddress.Any, port));
-                udpClient.ReceiveTimeout = 10 * 1000; // ten seconds
+                udpClient.MulticastLoopback = false;
+                udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
+                udpClient.Client.ReceiveTimeout = 10 * 1000; // ten seconds
 
-                localEndPoint = new IPEndPoint(IPAddress.GetLocal(), port);
+                localIPs = Util.GetLocalIPs();
 
                 SendBeacon();
 
@@ -60,13 +61,19 @@ namespace UOS
                             {
                                 IPEndPoint endPoint = null;
                                 byte[] msg = udpClient.Receive(ref endPoint);
-                                if (!localEndPoint.Equals(endPoint))
+                                if (System.Array.IndexOf<IPAddress>(localIPs, endPoint.Address) < 0)
                                     PushEvent(new ReceiveEvent() { data = msg, remoteEndPoint = endPoint });
                             }
-                            catch (SocketTimoutException)
+                            catch (SocketException e)
                             {
-                                // Timeout is expected!
-                                SendBeacon();
+                                if (e.SocketErrorCode == SocketError.TimedOut)
+                                {
+                                    // Timeout is expected!
+                                    logger.Log("Timed out!");
+                                    SendBeacon();
+                                }
+                                else
+                                    PushEvent(e);
                             }
                             catch (System.Exception e)
                             {

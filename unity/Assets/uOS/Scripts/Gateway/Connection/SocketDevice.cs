@@ -1,7 +1,4 @@
-﻿using UOS.Net;
-
-
-namespace UOS
+﻿namespace UOS
 {
     /// <summary>
     /// What are the possible types of connections over ethernet?
