@@ -25,8 +25,7 @@ namespace UOS
             {
                 if (tcpListener.Pending())
                     return new TCPClientConnection(tcpListener.AcceptTcpClient());
-                else
-                    Thread.Sleep(100);
+                Thread.Sleep(50);
             }
 
             return null;

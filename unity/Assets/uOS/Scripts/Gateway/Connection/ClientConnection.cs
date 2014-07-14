@@ -1,7 +1,4 @@
-﻿using System.Text;
-
-
-namespace UOS
+﻿namespace UOS
 {
     public abstract class ClientConnection
     {

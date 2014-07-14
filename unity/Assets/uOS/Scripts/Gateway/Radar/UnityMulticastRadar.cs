@@ -67,11 +67,8 @@ namespace UOS
                             catch (SocketException e)
                             {
                                 if (e.SocketErrorCode == SocketError.TimedOut)
-                                {
                                     // Timeout is expected!
-                                    logger.Log("Timed out!");
                                     SendBeacon();
-                                }
                                 else
                                     PushEvent(e);
                             }

@@ -68,7 +68,6 @@ namespace UOS
         {
             type = Message.Type.SERVICE_CALL_REQUEST;
             serviceType = ServiceType.DISCRETE;
-            channels = 1;
         }
 
         public Call(string driver, string service)

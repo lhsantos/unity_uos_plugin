@@ -14,6 +14,7 @@ public class TestUOS : MonoBehaviour, Logger, UOSApplication
     /// </summary>
     void Start()
     {
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
         uOS.Init(this, this);
     }
 

@@ -179,13 +179,13 @@ namespace UOS
                         else
                             throw new System.Exception("Couldn't establish connection to client.");
 
-                        while (gatewayServer.running && con.connected)
+                        if (con.connected)
                         {
                             StringBuilder builder = new StringBuilder();
-                            byte[] data = new byte[1024];
-                            int read;
-                            while ((read = (data = con.Read()).Length) > 0)
+                            byte[] data = con.Read();
+                            if ((data != null) && (data.Length > 0))
                             {
+                                int read = data.Length;
                                 string[] msgs = Encoding.UTF8.GetString(data, 0, read).Split('\n');
                                 int last = msgs.Length - 1;
                                 int i = 0;
@@ -217,16 +217,19 @@ namespace UOS
                                     }
                                 }
                             }
+                            con.Close();
                         }
                     }
                     catch (System.Threading.ThreadAbortException)
                     {
-                        if (con != null) con.Close();
+                        if ((con != null) && (con.connected))
+                            con.Close();
                         return;
                     }
                     catch (System.Exception e)
                     {
-                        if (con != null) con.Close();
+                        if ((con != null) && (con.connected))
+                            con.Close();
                         gatewayServer.PushLog("Failed to handle ubiquitos-smartspace connection. ", e);
                     }
                 }
